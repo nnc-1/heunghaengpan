@@ -157,6 +157,10 @@
     setTimeout(refreshLogin, 300);
     mk('앱 로그인 정보 지우기', onClearLogin);
     mk('저장 폴더 열기', () => call('open_folder').catch(e => alert(String(e))));
+    const themeLabel = () => (window.isDark && isDark()) ? '☀ 라이트 모드' : '🌙 다크 모드';
+    const themeBtn = mk(themeLabel(), () => { if (window.toggleTheme) toggleTheme(); themeBtn.textContent = themeLabel(); });
+    themeBtn.title = '화면을 밝게/어둡게 바꿔요 (선택은 기억돼요)';
+    try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { themeBtn.textContent = themeLabel(); }); } catch (e) {}
     statusEl = document.createElement('span');
     statusEl.style.cssText = 'color:var(--sub);font-size:13px';
     bar.appendChild(statusEl);
@@ -191,9 +195,9 @@
 
   async function onClearLogin() {
     if (!confirm('이 PC의 아래 위치에 있는 앱 안 브라우저 데이터(크랙·구글 등의 로그인 정보와 캐시)를 모두 지워요.\n\n%LOCALAPPDATA%\\com.nnc1.heunghaengpan\\EBWebView\n\n스냅샷과 장부 파일은 지워지지 않아요. 새로운 스냅샷을 받으려면 크랙 페이지 열기에서 다시 로그인해야 해요.\n\n지울까요?')) return;
-    let keep = null; try { keep = localStorage.getItem('hh_block_until'); } catch (e) {}
+    let keep = null, theme = null; try { keep = localStorage.getItem('hh_block_until'); theme = localStorage.getItem('hh_theme'); } catch (e) {}
     try { await call('clear_login_data'); } catch (e) { alert('지우지 못했어요: ' + e); return; }
-    try { if (keep) localStorage.setItem('hh_block_until', keep); } catch (e) {} // 접속 제한 시간은 유지
+    try { if (keep) localStorage.setItem('hh_block_until', keep); if (theme) localStorage.setItem('hh_theme', theme); } catch (e) {} // 접속 제한 시간과 화면 테마는 유지
     await refreshLogin();
     alert('지웠어요.');
   }

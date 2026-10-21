@@ -1,7 +1,8 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>흥행판</title><style>
 :root{--bg:#f6f6f4;--card:#fff;--fg:#1b1b1b;--sub:#6b6b6b;--line:#e2e2de;--acc:#c2410c;--chip:#efefeb;--up:#15803d;--flat:#9a9a9a;--hr:rgba(194,65,12,.07);--hc:rgba(194,65,12,.07);--hx:rgba(194,65,12,.16)}
-@media(prefers-color-scheme:dark){:root{--bg:#141414;--card:#1e1e1e;--fg:#ececec;--sub:#9a9a9a;--line:#2e2e2e;--acc:#fb923c;--chip:#2a2a2a;--up:#4ade80;--flat:#777;--hr:rgba(251,146,60,.10);--hc:rgba(251,146,60,.10);--hx:rgba(251,146,60,.22)}}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#141414;--card:#1e1e1e;--fg:#ececec;--sub:#9a9a9a;--line:#2e2e2e;--acc:#fb923c;--chip:#2a2a2a;--up:#4ade80;--flat:#777;--hr:rgba(251,146,60,.10);--hc:rgba(251,146,60,.10);--hx:rgba(251,146,60,.22);color-scheme:dark}}
+:root[data-theme=dark]{--bg:#141414;--card:#1e1e1e;--fg:#ececec;--sub:#9a9a9a;--line:#2e2e2e;--acc:#fb923c;--chip:#2a2a2a;--up:#4ade80;--flat:#777;--hr:rgba(251,146,60,.10);--hc:rgba(251,146,60,.10);--hx:rgba(251,146,60,.22);color-scheme:dark}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.55 system-ui,"Malgun Gothic",sans-serif}
 header{background:var(--bg);border-bottom:1px solid var(--line);padding:10px 16px;z-index:2}
 h1{font-size:17px;margin:0 0 8px}.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -58,6 +59,12 @@ td>span:first-child:not(.nm):not(.badge){display:block;min-height:1.25em}td a:ho
 </section>
 </div>
 <script>
+// 화면 테마: 저장된 선택(밝게/어둡게)이 있으면 그걸, 없으면 시스템 설정을 따름
+function applyTheme(t){const r=document.documentElement;if(t==='dark'||t==='light')r.dataset.theme=t;else delete r.dataset.theme}
+try{applyTheme(localStorage.getItem('hh_theme'))}catch(e){}
+function isDark(){const t=document.documentElement.dataset.theme;return t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches}
+function toggleTheme(){const t=isDark()?'light':'dark';applyTheme(t);try{localStorage.setItem('hh_theme',t)}catch(e){}return t}
+
 const $=s=>document.querySelector(s);let SNAPS=[];// [{date, map:{id:work}}]
 function addSnap(obj){
  if(obj&&obj.kind==='heunghaengpan-ledger'){if(LEDGER.entries.length&&!confirm('저장된 수익 장부가 있어요. 불러온 장부로 바꿀까요?'))return;setLedger(obj);saveLedger();render();return}
@@ -89,6 +96,12 @@ function updateLedger(){
  if(!SNAPS.length)return;let ch=false;
  // 정산 정보가 없는 기록은 구간 경계로 쓰지 않음. 예전에 그런 기록에서 끝난 빈 구간은 되돌려서 앞 기록부터 다시 계산
  while(LEDGER.last&&!LEDGER.last.account&&LEDGER.entries.length){const e=LEDGER.entries[LEDGER.entries.length-1];if(e.to!==LEDGER.last.date)break;const prev=SNAPS.find(x=>x.date===e.from);if(!prev)break;LEDGER.entries.pop();LEDGER.last=mini(prev);ch=true}
+ // 장부 중간의 빈 구간(정산 없는 기록 때문에 계산 못 한 구간)은 앞뒤의 정산 있는 기록으로 한 구간으로 다시 계산
+ {const E=LEDGER.entries,find=d=>SNAPS.find(x=>x.date===d),nul=e=>e.poolC==null&&e.poolM==null;
+  for(let i=0;i<E.length;i++){if(!nul(E[i]))continue;const a=find(E[i].from);if(!a||!a.account)continue;
+   let j=i;while(j<E.length&&nul(E[j])){const b=find(E[j].to);if(b&&b.account)break;j++}
+   if(j>=E.length||!nul(E[j]))continue;const b=find(E[j].to);if(!b||!b.account)continue;
+   E.splice(i,j-i+1,interval(mini(a),mini(b)));ch=true}}
  if(!LEDGER.last){LEDGER.last=mini(SNAPS.find(x=>x.account)||SNAPS[0]);ch=true}
  for(const sn of SNAPS){if(sn.date<=LEDGER.last.date||!sn.account)continue;LEDGER.entries.push(interval(LEDGER.last,sn));LEDGER.last=mini(sn);ch=true}
  if(ch){saveLedger();render()}
@@ -237,7 +250,7 @@ function drawChart(){
  let h=`<div class=top><b>${esc(nm)}</b><span><span class=seg>${Object.entries(M).map(([k,v])=>`<button data-m=${k} class="${ON.includes(k)?'on':''}" title="눌러서 이 줄 ${ON.includes(k)?'숨기기':'보이기'}">${v}</button>`).join('')}</span> <button id=cx>닫기</button></span></div>`;
  if(TS.length<2)h+=`<div class=count>기록이 1개뿐이라 그래프를 그릴 수 없어요. 스냅샷을 날짜별로 더 쌓아 주세요.</div>`;
  else{
-  const T=6,RH=58,GAP=12,B=24,n=rowsD.length,H=T+n*RH+(n-1)*GAP+B;
+  const T=6,GAP=12,B=24,n=rowsD.length,AREA=4*58+3*GAP,RH=(AREA-(n-1)*GAP)/n,H=T+AREA+B; // 항목 수와 상관없이 전체 높이는 같고, 줄 높이를 나눠 가짐
   const t0=TS[0],t1=TS[TS.length-1],X=t=>L+(W-L-R)*(t1===t0?0:(t-t0)/(t1-t0));
   h+=`<svg viewBox="0 0 ${W} ${H}">`;
   rowsD.forEach((r,i)=>{const y0=T+i*(RH+GAP),col=MCOL[r.k]||'var(--acc)';
