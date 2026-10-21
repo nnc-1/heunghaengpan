@@ -12,7 +12,7 @@ body{height:100vh;display:flex;flex-direction:column}#app{flex:1;min-height:0;di
 .drop{border:2px dashed var(--line);border-radius:10px;padding:8px 12px;text-align:center;color:var(--sub);margin:0 0 10px;font-size:13px}
 #empty{display:none;flex:1;border:2px dashed var(--line);border-radius:14px;align-items:center;justify-content:center;text-align:center;color:var(--sub);padding:40px;min-height:260px}#empty b{display:block;font-size:22px;color:var(--fg);margin-bottom:14px}#empty p{margin:4px 0;font-size:15px}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:center;vertical-align:middle;white-space:nowrap}
-th:nth-child(2),td:nth-child(2){text-align:left}th:nth-child(n+4):nth-child(-n+10),td:nth-child(n+4):nth-child(-n+10){text-align:right}td:nth-child(2){white-space:normal;width:17.5em;min-width:17.5em;max-width:17.5em;overflow-wrap:anywhere}th{cursor:pointer;color:var(--sub);font-weight:600}
+th:nth-child(2),td:nth-child(2){text-align:left}th:nth-child(n+4):nth-child(-n+11),td:nth-child(n+4):nth-child(-n+11){text-align:right}td:nth-child(2){white-space:normal;width:17.5em;min-width:17.5em;max-width:17.5em;overflow-wrap:anywhere}th{cursor:pointer;color:var(--sub);font-weight:600}
 td a{color:inherit;text-decoration:none}
 .l2{display:block;min-height:1.25em;font-size:12px;line-height:1.25}th .l2{font-size:12px;font-weight:500}th .hk{cursor:pointer}th .hk:hover{color:var(--fg);text-decoration:underline}
 .tg{display:inline-block;font-size:10.5px;border-radius:5px;padding:0 4px;margin:0 2px;line-height:1.3;white-space:nowrap}.tg.or{background:#2563eb;color:#fff}.tg.on{background:#7c3aed;color:#fff}
@@ -60,6 +60,7 @@ td>span:first-child:not(.nm):not(.badge){display:block;min-height:1.25em}td a:ho
 <script>
 const $=s=>document.querySelector(s);let SNAPS=[];// [{date, map:{id:work}}]
 function addSnap(obj){
+ if(obj&&obj.kind==='heunghaengpan-ledger'){if(LEDGER.entries.length&&!confirm('저장된 수익 장부가 있어요. 불러온 장부로 바꿀까요?'))return;setLedger(obj);saveLedger();render();return}
  if(Array.isArray(obj.snapshots)){obj.snapshots.forEach(addSnap);return}
  const date=obj.snapshot_id||obj.snapshot_date||obj.captured_at?.slice(0,10)||('무명'+SNAPS.length);
  if(SNAPS.some(s=>s.date===date))SNAPS=SNAPS.filter(s=>s.date!==date);
@@ -68,7 +69,29 @@ function addSnap(obj){
  rebuildBase();save();render();drawMgr();
 }
 function save(){try{localStorage.setItem('hh_snaps',JSON.stringify(SNAPS.map(s=>({snapshot_date:s.date,works:Object.values(s.map),account:s.account}))))}catch(e){}}
-function rebuildBase(){}
+// ---------- 수익 장부: 기간(스냅샷과 스냅샷 사이)별 추정 수익을 이어서 쌓는다 ----------
+let LEDGER={kind:'heunghaengpan-ledger',version:1,entries:[],last:null},LT=null;
+try{const o=JSON.parse(localStorage.getItem('hh_ledger')||'null');if(o&&o.kind==='heunghaengpan-ledger')LEDGER=o}catch(e){}
+function saveLedger(){try{localStorage.setItem('hh_ledger',JSON.stringify(LEDGER))}catch(e){}}
+function setLedger(o){if(o&&o.kind==='heunghaengpan-ledger'&&Array.isArray(o.entries))LEDGER=o}
+const mini=s=>({date:s.date,account:s.account||null,map:Object.fromEntries(Object.values(s.map).map(w=>[w.id,{msg:w.msg}]))});
+function interval(a,b){
+ const ws={c:0,m:0},wt={};
+ Object.values(b.map).forEach(w=>{const bw=a.map[w.id],v=(bw&&w.msg!=null&&bw.msg!=null)?Math.max(w.msg-bw.msg,0):0;wt[w.id]=v;if(w.original)ws.m+=v;else ws.c+=v});
+ const same=a.date.slice(0,7)===b.date.slice(0,7),ac=a.account,bc=b.account;
+ // 같은 달: 두 값의 차이 / 달이 바뀜: 새 달 1일부터 쌓인 값(직전 달 말의 증가분은 알 수 없음)
+ const pool=k=>{if(!bc||bc[k]==null)return null;if(same){if(!ac||ac[k]==null)return null;return Math.max(bc[k]-ac[k],0)}return Math.max(bc[k],0)};
+ const pc=pool('expectedCash'),pm=pool('expectedMoney'),w={};
+ Object.values(b.map).forEach(x=>{const m=!!x.original,p=m?pm:pc,sm=m?ws.m:ws.c,v=wt[x.id];if(p!=null&&sm>0&&v>0){const amt=Math.round(p*v/sm*10)/10;w[x.id]=m?[0,amt]:[amt,0]}});
+ return{from:a.date,to:b.date,cross:!same,poolC:pc,poolM:pm,w};
+}
+function updateLedger(){
+ if(!SNAPS.length)return;let ch=false,start=0;
+ if(!LEDGER.last){LEDGER.last=mini(SNAPS[0]);start=1;ch=true}
+ for(let i=start;i<SNAPS.length;i++){const sn=SNAPS[i];if(sn.date<=LEDGER.last.date)continue;LEDGER.entries.push(interval(LEDGER.last,sn));LEDGER.last=mini(sn);ch=true}
+ if(ch){saveLedger();render()}
+}
+function rebuildBase(){clearTimeout(LT);LT=setTimeout(updateLedger,400)}
 const readFiles=fl=>[...fl].forEach(f=>{const r=new FileReader();r.onload=()=>{try{addSnap(JSON.parse(r.result))}catch(x){alert(f.name+': 읽기 실패')}};r.readAsText(f)});
 const fpick=document.createElement('input');fpick.type='file';fpick.accept='.json,application/json';fpick.multiple=true;fpick.style.display='none';document.body.appendChild(fpick);
 fpick.onchange=()=>{readFiles(fpick.files);fpick.value=''};
@@ -77,7 +100,7 @@ fpick.onchange=()=>{readFiles(fpick.files);fpick.value=''};
  el.ondragleave=()=>el.style.borderColor='';
  el.ondrop=e=>{e.preventDefault();el.style.borderColor='';readFiles(e.dataTransfer.files)}});
 let sortKey='msg',sortDir=-1;
-let kindIdx=0;
+let kindIdx=0,spIdx=0;
 function render(){
  if(!SNAPS.length){$('#count').textContent='스냅샷을 올려주세요.';return;}
  let latest=SNAPS[SNAPS.length-1];const vis=$('#vis').value,ty=$('#type').value,ad=$('#adult').value,q=$('#q').value.trim().toLowerCase();
@@ -94,22 +117,26 @@ function render(){
  allW.forEach(w=>{const v=Math.max(d(w,'msg')||0,0);if(w.original)ws.m+=v;else ws.c+=v});
  allW.forEach(w=>{const v=Math.max(d(w,'msg')||0,0),m=!!w.original,p=m?poolM:poolC,sm=m?ws.m:ws.c;w.ek=m?'현금':'캐시';w.est=(p!=null&&sm>0&&base.map[w.id])?p*v/sm:null});
  const KO=[['언세이프','캐릭터','세이프'],['캐릭터','언세이프','세이프']][kindIdx];
- rows.sort((a,b)=>{if(sortKey==='kind')return KO.indexOf(a.kind)-KO.indexOf(b.kind)||(b.msg||0)-(a.msg||0);const av=sortKey.startsWith('d_')?(d(a,sortKey.slice(2))??-1):a[sortKey],bv=sortKey.startsWith('d_')?(d(b,sortKey.slice(2))??-1):b[sortKey];return typeof av==='string'||typeof bv==='string'?String(av||'').localeCompare(String(bv||''))*sortDir:((av??-1)-(bv??-1))*sortDir});
+ rows.sort((a,b)=>{if(sortKey==='sp'){const r=w=>w.original?0:w.only?1:2,SO=[[0,1,2],[1,0,2]][spIdx];return SO[r(a)]-SO[r(b)]||(b.msg||0)-(a.msg||0)}if(sortKey==='kind')return KO.indexOf(a.kind)-KO.indexOf(b.kind)||(b.msg||0)-(a.msg||0);const av=sortKey.startsWith('d_')?(d(a,sortKey.slice(2))??-1):a[sortKey],bv=sortKey.startsWith('d_')?(d(b,sortKey.slice(2))??-1):b[sortKey];return typeof av==='string'||typeof bv==='string'?String(av||'').localeCompare(String(bv||''))*sortDir:((av??-1)-(bv??-1))*sortDir});
  const H=(a,ak,b,bk)=>`<th><span class="hk" data-k="${ak}">${a}</span>${b?`<span class="l2"><span class="hk" data-k="${bk}">${b}</span></span>`:'<span class="l2"></span>'}</th>`;
- $('#tbl thead').innerHTML='<tr>'+[H('타입','kind'),H('작품명','name'),H('상태','visibility'),H('대화수','msg','대화 증가','d_msg'),H('추정 수익','est'),H('좋아요','like','좋아요 증가','d_like'),H('댓글','comment','댓글 증가','d_comment'),H('대화방','chat','대화방 증가','d_chat'),H('방당 대화','r_room'),H('좋아요당 대화','r_like'),H('생성일','created')].join('')+'</tr>';
- {const e=$('#tbl thead [data-k=est]');if(e)e.title='추정치예요. 비교한 두 기록 사이 계정 정산 증가분(같은 달일 때만)을 작품별 대화 증가 비율로 나눠요. 캐시는 오리지널 외 작품, 현금은 오리지널 작품에 나눠요. 추가 기능 사용량과 온리 가산은 반영되지 않아요.'}
- $('#tbl thead').querySelectorAll('.hk').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k==='link')return;if(k==='kind'){kindIdx=sortKey==='kind'?(kindIdx+1)%2:0;sortKey='kind';render();return}if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=k==='name'||k==='created'?1:-1}render()});
+ $('#tbl thead').innerHTML='<tr>'+[H('타입','kind','온리/오리지널','sp'),H('작품명','name'),H('상태','visibility'),H('대화수','msg','대화 증가','d_msg'),H('추정 수익','est'),H('누적 수익','cum'),H('좋아요','like','좋아요 증가','d_like'),H('댓글','comment','댓글 증가','d_comment'),H('대화방','chat','대화방 증가','d_chat'),H('방당 대화','r_room'),H('좋아요당 대화','r_like'),H('생성일','created')].join('')+'</tr>';
+ {const e=$('#tbl thead [data-k=est]');const cu=$('#tbl thead [data-k=cum]');if(cu)cu.title='수익 장부에 쌓인 기간별 추정 수익의 합이에요. 스냅샷을 지워도 장부는 남아요. 달이 바뀐 구간은 월말에 받은 뒤의 증가분이 빠졌을 수 있어요.';if(e)e.title='추정치예요. 비교한 두 기록 사이 계정 정산 증가분(같은 달일 때만)을 작품별 대화 증가 비율로 나눠요. 캐시는 오리지널 외 작품, 현금은 오리지널 작품에 나눠요. 추가 기능 사용량과 온리 가산은 반영되지 않아요.'}
+ $('#tbl thead').querySelectorAll('.hk').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k==='link')return;if(k==='sp'){spIdx=sortKey==='sp'?(spIdx+1)%2:0;sortKey='sp';render();return}if(k==='kind'){kindIdx=sortKey==='kind'?(kindIdx+1)%2:0;sortKey='kind';render();return}if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=k==='name'||k==='created'?1:-1}render()});
  const V={public:'공개',private:'비공개',linkonly:'링크'};
  const fmt=n=>n==null?'':n.toLocaleString('ko-KR');const f1=n=>n==null?'':n.toLocaleString('ko-KR',{maximumFractionDigits:1});const dd=v=>v==null?'':v>0?`<span class="up">+${fmt(v)}</span>`:v<0?`<span>${fmt(v)}</span>`:'<span class="flat">0</span>';
+const cumM={};let cumC=0,cumMo=0,crossN=0;
+ (LEDGER.entries||[]).forEach(e=>{if(e.cross)crossN++;cumC+=e.poolC||0;cumMo+=e.poolM||0;Object.keys(e.w||{}).forEach(id=>{const c=cumM[id]=cumM[id]||[0,0];c[0]+=e.w[id][0];c[1]+=e.w[id][1]})});
+ allW.forEach(w=>{const c=cumM[w.id];w.cum=c?(w.original?c[1]:c[0]):null});
  const S2=(a,b)=>`<td><span>${a}</span><span class="l2">${b}</span></td>`;
  const estC=w=>w.est==null?'<td><span class="flat">-</span><span class="l2 flat">'+w.ek+'</span></td>':`<td><span>≈${fmt(Math.round(w.est))}</span><span class="l2 flat">${w.ek}</span></td>`;
- $('#tbl tbody').innerHTML=rows.map(w=>`<tr><td class="kd"><span class=badge style="margin:0">${w.kind}</span><span class="l2">${w.original?'<span class="tg or">오리지널</span>':''}${w.only?'<span class="tg on">온리</span>':''}</span></td><td><span class=nm data-id="${w.id}" style="cursor:pointer">${w.name}</span></td><td>${V[w.visibility]||w.visibility}</td>${S2(fmt(w.msg),dd(d(w,'msg')))}${estC(w)}${S2(fmt(w.like),dd(d(w,'like')))}${S2(fmt(w.comment),dd(d(w,'comment')))}${S2(fmt(w.chat),dd(d(w,'chat')))}<td>${f1(w.r_room)}</td><td>${f1(w.r_like)}</td><td class="kd"><span>${w.created||''}</span><span class="l2">${w.sourceId?`<a class=tr href="https://crack.wrtn.ai/${w.type==='character'?'characters/'+w.sourceId+'/detail':'detail/'+w.sourceId}" target="_blank" rel="noopener" style="border:1px solid var(--sub);text-decoration:none;white-space:nowrap">크랙에서 보기</a>`:''}</span></td></tr>`).join('');
+ const cumC2=w=>w.cum==null?'<td><span class="flat">-</span><span class="l2 flat">'+w.ek+'</span></td>':`<td><span>≈${fmt(Math.round(w.cum))}</span><span class="l2 flat">${w.ek}</span></td>`;
+ $('#tbl tbody').innerHTML=rows.map(w=>`<tr><td class="kd"><span class=badge style="margin:0">${w.kind}</span><span class="l2">${w.original?'<span class="tg or">오리지널</span>':''}${w.only?'<span class="tg on">온리</span>':''}</span></td><td><span class=nm data-id="${w.id}" style="cursor:pointer">${w.name}</span></td><td>${V[w.visibility]||w.visibility}</td>${S2(fmt(w.msg),dd(d(w,'msg')))}${estC(w)}${cumC2(w)}${S2(fmt(w.like),dd(d(w,'like')))}${S2(fmt(w.comment),dd(d(w,'comment')))}${S2(fmt(w.chat),dd(d(w,'chat')))}<td>${f1(w.r_room)}</td><td>${f1(w.r_like)}</td><td class="kd"><span>${w.created||''}</span><span class="l2">${w.sourceId?`<a class=tr href="https://crack.wrtn.ai/${w.type==='character'?'characters/'+w.sourceId+'/detail':'detail/'+w.sourceId}" target="_blank" rel="noopener" style="border:1px solid var(--sub);text-decoration:none;white-space:nowrap">크랙에서 보기</a>`:''}</span></td></tr>`).join('');
  try{hint()}catch(e){}
  const ac=latest.account,acEl=$('#acct');
  if(!ac||(ac.expectedCash==null&&ac.expectedMoney==null))acEl.style.display='none';
  else{const bc=base&&base.account;
   const sameMon=base&&latest.date.slice(0,7)===base.date.slice(0,7);const chip=(k,t)=>{if(ac[k]==null)return '';const dv=bc&&bc[k]!=null&&sameMon?ac[k]-bc[k]:null;const rs=bc&&bc[k]!=null&&!sameMon;return `<span data-ak="${k}" style="cursor:pointer" title="정산 예상은 매월 초 초기화돼요. 눌러서 추이 보기">${t} <b>${fmt(ac[k])}</b>${rs?' <span class="flat">(월 초기화)</span>':''}${dv==null?'':` (${dv>0?`<span class="up">+${fmt(dv)}</span>`:dv<0?`<span>-${fmt(-dv)}</span>`:'<span class="flat">0</span>'})`}</span>`};
-  acEl.innerHTML=`<b style="color:var(--sub);font-weight:600;margin-right:14px">계정 정산</b>`+[chip('expectedCash','정산 예상 캐시'),chip('expectedMoney','정산 예상 현금')].filter(Boolean).join('<span style="color:var(--line);margin:0 14px">|</span>');
+  acEl.innerHTML=`<b style="color:var(--sub);font-weight:600;margin-right:14px">계정 정산</b>`+[chip('expectedCash','정산 예상 캐시'),chip('expectedMoney','정산 예상 현금')].filter(Boolean).join('<span style="color:var(--line);margin:0 14px">|</span>')+(LEDGER.entries.length?`<span style="color:var(--line);margin:0 14px">|</span><span title="스냅샷 사이 정산 증가분을 이어서 더한 값이에요. 달이 바뀐 구간은 월말에 받은 뒤의 증가분이 빠졌을 수 있어요." style="cursor:help">누적 추정 캐시 <b>${fmt(Math.round(cumC))}</b> · 현금 <b>${fmt(Math.round(cumMo))}</b>${crossN?` <span class="flat">(누락 가능 ${crossN}구간)</span>`:''}</span>`:'');
   acEl.style.display='block'}
  const sm=$('#sum');
  if(base){
@@ -151,7 +178,7 @@ function drawMgr(){emptyState();
  if(!MGR_OPEN){m.innerHTML=top+bar;return}
  m.innerHTML=top+bar
  +`<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:2px 0 8px"><span>선택: ${SEL.length?SEL.join(' ↔ '):'체크박스로 기록 2개를 고르세요'}</span><button id="selclr"${SEL.length?'':' disabled'}>선택 해제</button></div>`
- +`<div class="count" style="margin:0 0 6px">삭제는 이 화면의 저장 기록에서만 지워져요. 다운로드 폴더의 json 파일은 그대로 남고, 지운 기록은 되돌릴 수 없어요. 지우기 전에 <b>기록 내보내기</b>로 백업해 두면 안전해요.</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px"><button id="exp" title="쌓인 스냅샷 전부를 파일 하나로 저장">기록 내보내기</button><label style="display:flex;align-items:center;gap:6px;color:var(--sub);cursor:pointer"><input type="checkbox" id="noacct"${NOACCT?' checked':''}>정산 정보 빼고 내보내기</label><button id="dall" title="이 화면의 지울 기록 체크 전체 선택/해제"${SNAPS.length?'':' disabled'}>${DEL.length===SNAPS.length&&DEL.length?'지울 기록 체크 해제':'지울 기록 전체 체크'}</button><button id="delsel" title="오른쪽 빨간 체크박스로 고른 기록만 지우기"${DEL.length?'':' disabled'}>선택한 기록 지우기${DEL.length?' ('+DEL.length+'개)':''}</button><button id="clear" title="저장된 스냅샷 기록을 전부 지우기">전체 기록 지우기</button></div>`
+ +`<div class="count" style="margin:0 0 6px">삭제는 이 화면의 저장 기록에서만 지워져요. 다운로드 폴더의 json 파일은 그대로 남고, 지운 기록은 되돌릴 수 없어요. 지우기 전에 <b>기록 내보내기</b>로 백업해 두면 안전해요.</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px"><button id="exp" title="쌓인 스냅샷 전부를 파일 하나로 저장">기록 내보내기</button><label style="display:flex;align-items:center;gap:6px;color:var(--sub);cursor:pointer"><input type="checkbox" id="noacct"${NOACCT?' checked':''}>정산 정보 빼고 내보내기</label><button id="dall" title="이 화면의 지울 기록 체크 전체 선택/해제"${SNAPS.length?'':' disabled'}>${DEL.length===SNAPS.length&&DEL.length?'지울 기록 체크 해제':'지울 기록 전체 체크'}</button><button id="delsel" title="오른쪽 빨간 체크박스로 고른 기록만 지우기"${DEL.length?'':' disabled'}>선택한 기록 지우기${DEL.length?' ('+DEL.length+'개)':''}</button><button id="clear" title="저장된 스냅샷 기록을 전부 지우기">전체 기록 지우기</button>${window.__TAURI__?'':'<button id="lexp" title="수익 장부를 파일로 저장">수익 장부 내보내기</button>'}<button id="lreset" title="수익 장부를 비우고 현재 기록부터 다시 쌓기">수익 장부 초기화</button></div>`
  +(rows?`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);padding:2px 0 4px"><span>◀ 비교할 기록 (2개까지 체크)</span><span style="color:#dc2626">지울 기록 체크 ▶</span></div>`+rows:'<div class="count">저장된 기록이 없어요.</div>')
  +(pages>1?`<div style="display:flex;justify-content:center;gap:10px;align-items:center;padding-top:8px;border-top:1px solid var(--line)"><button data-pg="-1"${PG?'':' disabled'}>이전</button><span>${PG+1} / ${pages}</span><button data-pg="1"${PG<pages-1?'':' disabled'}>다음</button></div>`:'');
 }
@@ -162,6 +189,8 @@ $('#mgr').onchange=e=>{if(e.target.id==='noacct'){NOACCT=e.target.checked;return
 $('#mgr').onclick=e=>{
  const t=e.target,d=t.dataset||{};
  if(t.id==='exp'){doExport();return}
+ if(t.id==='lexp'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(LEDGER,null,1)],{type:'application/json'}));a.download='흥행판_수익장부.json';document.body.appendChild(a);a.click();a.remove();return}
+ if(t.id==='lreset'){if(!confirm('수익 장부를 비울까요? 지금 있는 스냅샷부터 다시 쌓이고, 지난 기간의 수익은 사라져요.'))return;LEDGER={kind:'heunghaengpan-ledger',version:1,entries:[],last:null};saveLedger();updateLedger();render();return}
  if(t.id==='clear'){doClear();return}
  if(t.id==='dall'){DEL=(DEL.length===SNAPS.length)?[]:SNAPS.map(x=>x.date);drawMgr();return}
  if(t.id==='delsel'){if(!DEL.length)return;if(!confirm('선택한 기록 '+DEL.length+'개를 지울까요?\n'+DEL.join('\n')+'\n(다운로드 폴더의 json 파일은 지워지지 않아요)'))return;const ds=DEL.slice();SNAPS=SNAPS.filter(x=>!ds.includes(x.date));SEL=SEL.filter(x=>!ds.includes(x));DEL=[];if(CMP&&CMP.some(x=>ds.includes(x)))CMP=null;save();rebuildBase();if(!SNAPS.length){$('#tbl tbody').innerHTML='';$('#sum').innerHTML='';chartId=null}render();drawChart();drawMgr();return}
