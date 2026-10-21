@@ -2,7 +2,7 @@
 // (폴더 자동 읽기/저장, 스냅샷 받기, 크랙 로그인, 링크 열기)
 (function () {
   'use strict';
-  try { localStorage.removeItem('hh_snaps'); } catch (e) {} // 앱에서는 폴더가 원본이라 브라우저 저장소는 쓰지 않음
+  try { localStorage.removeItem('hh_snaps'); localStorage.removeItem('hh_ledger'); } catch (e) {} // 앱에서는 폴더가 원본이라 브라우저 저장소는 쓰지 않음
 
   const T = () => window.__TAURI__ && window.__TAURI__.core;
   const call = (cmd, args) => T().invoke(cmd, args || {});
@@ -69,6 +69,12 @@
       if (before > 0 && SNAPS.length === 0) window.save();
     };
 
+    // 2-2) 수익 장부는 저장 폴더의 파일로 저장 (읽는 동안에는 덮어쓰지 않음)
+    window.saveLedger = function () {
+      if (loading) return;
+      call('save_ledger', { text: JSON.stringify(LEDGER) }).catch(e => alert('수익 장부를 저장하지 못했어요: ' + e));
+    };
+
     // 3) 전체 기록 내보내기는 앱 폴더의 '내보내기' 하위 폴더에 저장
     window.doExport = async function () {
       if (!SNAPS.length) { alert('내보낼 기록이 없어요.'); return; }
@@ -82,7 +88,7 @@
     // 4) 작품 링크는 기본 브라우저로 열기
     document.addEventListener('click', e => {
       const a = e.target.closest && e.target.closest('a[target=_blank]');
-      if (a) { e.preventDefault(); call('open_url', { url: a.href }).catch(() => {}); }
+      if (a) { e.preventDefault(); call('open_in_app', { url: a.href }).catch(() => call('open_url', { url: a.href }).catch(() => {})); }
     }, true);
 
     addBar();
@@ -90,6 +96,7 @@
   }
 
   async function loadFolder(orig) {
+    try { const lt = await call('read_ledger'); if (lt) setLedger(JSON.parse(lt)); } catch (e) {}
     const files = await call('list_snapshots');
     // 빠르게 읽으려고 화면 그리기를 잠시 멈췄다가 마지막에 한 번만 그림
     const R = { render: window.render, drawMgr: window.drawMgr, rebuildBase: window.rebuildBase };
@@ -141,7 +148,9 @@
     };
     const snapBtn = mk('스냅샷 받기', () => takeSnapshotUI(snapBtn), true);
     snapBtnRef = snapBtn; refreshLock(); setInterval(refreshLock, 20000);
-    mk('크랙 로그인', () => call('crack_login').catch(e => alert(String(e))));
+    loginBtn = mk('크랙 로그인 확인 중…', onLoginBtn);
+    loginBtn.disabled = true;
+    setTimeout(refreshLogin, 300);
     mk('저장 폴더 열기', () => call('open_folder').catch(e => alert(String(e))));
     statusEl = document.createElement('span');
     statusEl.style.cssText = 'color:var(--sub);font-size:13px';
@@ -150,8 +159,37 @@
     c.insertAdjacentElement('afterend', bar);
     const by = document.createElement('div');
     by.style.cssText = 'color:var(--sub);font-size:12px;margin:2px 0 0';
-    by.textContent = '넉넉한 취향이 클로드와 함께 만들었어요 · v개발.000003 (Tauri 시험판)';
+    by.textContent = '넉넉한 취향이 클로드와 함께 만들었어요 · v개발.000006 (Tauri 시험판)';
     h.appendChild(by);
+  }
+
+  // ---------- 크랙 로그인 / 로그아웃 (버튼 하나로 상태에 따라 바뀜) ----------
+  let loginBtn = null, loggedIn = false, loginPoll = null;
+  async function refreshLogin() {
+    if (!loginBtn) return;
+    try { loggedIn = !!(await call('crack_token')); } catch (e) { loggedIn = false; }
+    loginBtn.textContent = loggedIn ? '크랙 로그아웃' : '크랙 로그인';
+    loginBtn.disabled = false;
+    return loggedIn;
+  }
+  function watchLogin() { // 로그인 창이 열려 있는 동안만 3초마다 확인, 창이 닫히면 마지막으로 한 번 더 확인
+    if (loginPoll) return;
+    loginPoll = setInterval(async () => {
+      let open = false;
+      try { open = await call('crack_window_open'); } catch (e) {}
+      const ok = await refreshLogin();
+      if (!open || ok) { clearInterval(loginPoll); loginPoll = null; }
+    }, 3000);
+  }
+  async function onLoginBtn() {
+    if (loggedIn) {
+      if (!confirm('크랙에서 로그아웃할까요?\n(저장된 스냅샷 파일은 그대로예요. 다시 받으려면 로그인해야 해요.)')) return;
+      loginBtn.disabled = true; loginBtn.textContent = '로그아웃 중…';
+      try { await call('crack_logout'); } catch (e) { alert('로그아웃하지 못했어요: ' + e); }
+      await refreshLogin();
+    } else {
+      try { await call('crack_login'); watchLogin(); } catch (e) { alert(String(e)); }
+    }
   }
 
   // ---------- 스냅샷 간격 락 ----------
@@ -266,7 +304,7 @@
       btn.textContent = '로그인 확인 중…';
       let token = await call('crack_token');
       if (!token) {
-        await call('crack_login');
+        await call('crack_login'); watchLogin();
         alert('크랙 창이 열렸어요.\n로그인한 뒤 그 창을 닫고, 다시 \'스냅샷 받기\'를 눌러 주세요.');
         return;
       }
@@ -280,7 +318,7 @@
         try { localStorage.setItem('hh_block_until', String(Date.now() + BLOCK_HOURS * 3600000)); } catch (x) {}
         alert(`크랙이 요청을 막은 것 같아요 (응답 ${blockedStatus}).\n안전하게 ${BLOCK_HOURS}시간 동안 스냅샷 받기를 쉬어요.`);
       } else if (String(e.message || e) === 'LOGIN_REQUIRED') {
-        await call('crack_login').catch(() => {});
+        await call('crack_login').catch(() => {}); watchLogin();
         alert('로그인이 만료됐어요. 크랙 창에서 다시 로그인한 뒤 그 창을 닫고 시도해 주세요.');
       } else alert('오류: ' + (e.message || e));
     } finally {
@@ -296,12 +334,14 @@
       const rep = { snaps: SNAPS.length, rows, count: (document.querySelector('#count') || {}).textContent, status: statusEl && statusEl.textContent, diskKeys: Object.keys(diskKeys).length, buttons: [...document.querySelectorAll('header button')].map(b => b.textContent) };
       // 추가 검사: 새 기록 → 파일 저장, 화면에서 삭제 → '삭제됨' 이동, 토큰/네트워크 호출이 죽지 않는지
       const t = { works: [{ id: '1', name: 'x', msg: 1, like: 1, comment: 1, type: 'story', visibility: 'public' }], snapshot_id: '2026-10-22 12:34' };
-      window.addSnap(t); await sleep(400);
+      window.addSnap(t); await sleep(1200); rep.ledger = (await call('read_ledger') || '').length > 0;
       rep.afterAdd = (await call('list_snapshots')).map(f => f.name).filter(n => n.includes('12-34'));
       window.SNAPS_BEFORE = SNAPS.length;
       SNAPS = SNAPS.filter(s => s.date !== '2026-10-22 12:34'); window.save(); await sleep(400);
       rep.afterDelete = (await call('list_snapshots')).map(f => f.name).filter(n => n.includes('12-34'));
       try { rep.token = (await call('crack_token')).length; } catch (e) { rep.tokenErr = String(e); }
+      try { await call('crack_logout'); rep.logout = 'ok'; rep.openAfter = await call('crack_window_open'); } catch (e) { rep.logoutErr = String(e).slice(0, 80); }
+      rep.loginBtn = loginBtn && loginBtn.textContent;
       try { await call('http_get', { url: 'https://example.com/', token: '' }); rep.badUrl = 'allowed?!'; } catch (e) { rep.badUrl = 'blocked'; }
       try { const r = await call('http_get', { url: API + '/content/me?limit=1', token: '' }); rep.api = r.status; } catch (e) { rep.apiErr = String(e).slice(0, 60); }
       await call('selftest_report', { text: JSON.stringify(rep) });

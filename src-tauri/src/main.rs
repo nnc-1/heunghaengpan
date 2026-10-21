@@ -1,4 +1,4 @@
-// 흥행판 (Tauri 시험판 v개발.000003)
+// 흥행판 (Tauri 시험판 v개발.000006)
 // 넉넉한 취향이 클로드와 함께 만들었어요.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -7,10 +7,50 @@ use std::{fs, path::PathBuf, time::Duration};
 use tauri::{AppHandle, Manager, Url, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 const DIR_NAME: &str = "흥행판_스냅샷";
+const LEDGER_NAME: &str = "흥행판_수익장부.json";
 const CRACK_URL: &str = "https://crack.wrtn.ai/";
 const API_PREFIX: &str = "https://crack-api.wrtn.ai/";
 
+/// exe 옆의 저장 폴더(포터블). 만들거나 쓸 수 없으면 None.
+/// 처음 만들어질 때 예전 저장 위치(문서\흥행판_스냅샷)의 기록 파일을 복사해 온다 (원본은 그대로 둠).
+fn portable_dir(app: &AppHandle) -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?.join(DIR_NAME);
+    let existed = dir.is_dir();
+    fs::create_dir_all(&dir).ok()?;
+    let probe = dir.join(".쓰기확인");
+    fs::write(&probe, b"1").ok()?;
+    let _ = fs::remove_file(&probe);
+    if !existed {
+        if let Some(old) = old_docs_dir(app) {
+            if let Ok(rd) = fs::read_dir(&old) {
+                for e in rd.flatten() {
+                    let p = e.path();
+                    let n = e.file_name().to_string_lossy().to_string();
+                    if p.is_file() && n.to_lowercase().ends_with(".json") {
+                        let _ = fs::copy(&p, dir.join(&n));
+                    }
+                }
+            }
+        }
+    }
+    Some(dir)
+}
+
+fn old_docs_dir(app: &AppHandle) -> Option<PathBuf> {
+    let base = app
+        .path()
+        .document_dir()
+        .or_else(|_| app.path().home_dir().map(|h| h.join("Documents")))
+        .ok()?;
+    let d = base.join(DIR_NAME);
+    if d.is_dir() { Some(d) } else { None }
+}
+
 fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    if let Some(d) = portable_dir(app) {
+        return Ok(d);
+    }
     let base = app
         .path()
         .document_dir()
@@ -52,7 +92,7 @@ fn list_snapshots(app: AppHandle) -> Result<Vec<FileItem>, String> {
             continue;
         }
         let name = entry.file_name().to_string_lossy().to_string();
-        if !name.to_lowercase().ends_with(".json") {
+        if !name.to_lowercase().ends_with(".json") || name == LEDGER_NAME {
             continue;
         }
         if let Ok(text) = fs::read_to_string(&path) {
@@ -61,6 +101,23 @@ fn list_snapshots(app: AppHandle) -> Result<Vec<FileItem>, String> {
     }
     out.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(out)
+}
+
+/// 수익 장부 파일(저장 폴더 안, 스냅샷 목록에서는 제외)을 읽는다. 없으면 None.
+#[tauri::command]
+fn read_ledger(app: AppHandle) -> Result<Option<String>, String> {
+    let p = data_dir(&app)?.join(LEDGER_NAME);
+    if p.is_file() {
+        fs::read_to_string(&p).map(Some).map_err(|e| format!("수익 장부를 읽지 못했어요: {e}"))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+fn save_ledger(app: AppHandle, text: String) -> Result<(), String> {
+    let p = data_dir(&app)?.join(LEDGER_NAME);
+    fs::write(&p, text).map_err(|e| format!("수익 장부를 저장하지 못했어요: {e}"))
 }
 
 /// 스냅샷 파일을 저장 폴더에 쓴다. overwrite=false 이고 이미 있으면 건너뛴다.
@@ -131,6 +188,27 @@ fn open_url(app: AppHandle, url: String) -> Result<(), String> {
         return Err("크랙 주소만 열 수 있어요".into());
     }
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
+}
+
+/// 크랙 작품 페이지를 앱 안의 크랙 창에서 연다 (로그인 정보를 같이 씀). 이미 열려 있으면 그 창을 이동.
+#[tauri::command]
+async fn open_in_app(app: AppHandle, url: String) -> Result<(), String> {
+    if !url.starts_with(CRACK_URL) {
+        return Err("크랙 주소만 열 수 있어요".into());
+    }
+    let u: Url = Url::parse(&url).map_err(|e| e.to_string())?;
+    if let Some(w) = app.get_webview_window("crack") {
+        w.navigate(u).map_err(|e| e.to_string())?;
+        let _ = w.show();
+        let _ = w.set_focus();
+        return Ok(());
+    }
+    WebviewWindowBuilder::new(&app, "crack", WebviewUrl::External(u))
+        .title("크랙")
+        .inner_size(1100.0, 850.0)
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[derive(Serialize)]
@@ -209,6 +287,42 @@ async fn crack_token(app: AppHandle) -> Result<String, String> {
     Ok(token)
 }
 
+/// 크랙 로그인 창이 열려 있는지.
+#[tauri::command]
+fn crack_window_open(app: AppHandle) -> bool {
+    app.get_webview_window("crack").is_some()
+}
+
+/// 크랙 로그아웃: 크랙 창의 쿠키와 저장소를 지운다 (앱의 다른 데이터는 건드리지 않음).
+#[tauri::command]
+async fn crack_logout(app: AppHandle) -> Result<(), String> {
+    let url: Url = Url::parse(CRACK_URL).map_err(|e| e.to_string())?;
+    let (win, created) = match app.get_webview_window("crack") {
+        Some(w) => (w, false),
+        None => (
+            WebviewWindowBuilder::new(&app, "crack", WebviewUrl::External(url.clone()))
+                .title("크랙")
+                .visible(false)
+                .build()
+                .map_err(|e| e.to_string())?,
+            true,
+        ),
+    };
+    if created {
+        tokio_sleep(600).await;
+    }
+    let cookies = win.cookies_for_url(url).map_err(|e| e.to_string())?;
+    for c in cookies {
+        let _ = win.delete_cookie(c);
+    }
+    let _ = win.eval("try{localStorage.clear();sessionStorage.clear()}catch(e){}");
+    tokio_sleep(300).await;
+    if created {
+        let _ = win.close();
+    }
+    Ok(())
+}
+
 async fn tokio_sleep(ms: u64) {
     tauri::async_runtime::spawn_blocking(move || std::thread::sleep(Duration::from_millis(ms)))
         .await
@@ -244,22 +358,27 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             list_snapshots,
+            read_ledger,
+            save_ledger,
             save_snapshot,
             save_export,
             move_aside,
             data_dir_path,
             open_folder,
             open_url,
+            open_in_app,
             http_get,
             crack_login,
             crack_token,
+            crack_logout,
+            crack_window_open,
             selftest_enabled,
             selftest_log,
             selftest_report
         ])
         .setup(|app| {
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("흥행판 · v개발.000003")
+                .title("흥행판 · v개발.000006")
                 .inner_size(1600.0, 900.0)
                 .min_inner_size(900.0, 600.0)
                 .disable_drag_drop_handler()
