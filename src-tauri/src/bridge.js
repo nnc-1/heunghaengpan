@@ -85,7 +85,7 @@
       } catch (e) { alert('내보내기 실패: ' + e); }
     };
 
-    // 4) 작품 링크는 기본 브라우저로 열기
+    // 4) 작품 링크는 앱 안 크랙 창으로 열기 (안 되면 기본 브라우저)
     document.addEventListener('click', e => {
       const a = e.target.closest && e.target.closest('a[target=_blank]');
       if (a) { e.preventDefault(); call('open_in_app', { url: a.href }).then(() => watchLogin()).catch(() => call('open_url', { url: a.href }).catch(() => {})); }
@@ -164,7 +164,7 @@
     c.insertAdjacentElement('afterend', bar);
     const by = document.createElement('div');
     by.style.cssText = 'color:var(--sub);font-size:12px;margin:2px 0 0';
-    by.textContent = '넉넉한 취향이 클로드와 함께 만들었어요 · v개발.000008 (Tauri 시험판)';
+    by.textContent = '넉넉한 취향이 클로드와 함께 만들었어요 · v1.0.0';
     h.appendChild(by);
   }
 
@@ -190,7 +190,7 @@
   }
 
   async function onClearLogin() {
-    if (!confirm('앱 안 크랙 창에 남은 로그인 정보(크랙·구글 등)와 캐시를 모두 지울까요?\n(스냅샷과 장부 파일은 그대로예요. 다시 쓰려면 크랙 페이지 열기에서 로그인해야 해요.)')) return;
+    if (!confirm('이 PC의 아래 위치에 있는 앱 안 브라우저 데이터(크랙·구글 등의 로그인 정보와 캐시)를 모두 지워요.\n\n%LOCALAPPDATA%\\com.nnc1.heunghaengpan\\EBWebView\n\n스냅샷과 장부 파일은 지워지지 않아요. 새로운 스냅샷을 받으려면 크랙 페이지 열기에서 다시 로그인해야 해요.\n\n지울까요?')) return;
     let keep = null; try { keep = localStorage.getItem('hh_block_until'); } catch (e) {}
     try { await call('clear_login_data'); } catch (e) { alert('지우지 못했어요: ' + e); return; }
     try { if (keep) localStorage.setItem('hh_block_until', keep); } catch (e) {} // 접속 제한 시간은 유지

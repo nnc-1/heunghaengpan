@@ -1,4 +1,4 @@
-// 흥행판 (Tauri 시험판 v개발.000008)
+// 흥행판 v1.0.0
 // 넉넉한 취향이 클로드와 함께 만들었어요.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -281,7 +281,8 @@ async fn crack_token(app: AppHandle) -> Result<String, String> {
         .find(|c| c.name() == "access_token")
         .map(|c| c.value().to_string())
         .unwrap_or_default();
-    if created {
+    // 확인용으로 잠깐 만든 숨은 창만 닫는다 (그 사이 사용자가 '크랙 페이지 열기'로 띄웠으면 그대로 둠)
+    if created && !win.is_visible().unwrap_or(false) {
         let _ = win.close();
     }
     Ok(token)
@@ -360,7 +361,7 @@ fn main() {
         ])
         .setup(|app| {
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("흥행판 · v개발.000008")
+                .title("흥행판 · v1.0.0")
                 .inner_size(1600.0, 900.0)
                 .min_inner_size(900.0, 600.0)
                 .disable_drag_drop_handler()

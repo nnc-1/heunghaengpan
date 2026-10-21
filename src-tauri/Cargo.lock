@@ -1469,7 +1469,7 @@ checksum = "e17592d60ebacc7d5e169f4663c5f84f9161cc90328abcfe8456f41e4dfcb284"
 
 [[package]]
 name = "heunghaengpan"
-version = "0.0.1"
+version = "1.0.0"
 dependencies = [
  "reqwest 0.12.28",
  "serde",
