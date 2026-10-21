@@ -1,0 +1,17 @@
+{
+  "name": "heunghaengpan-tauri",
+  "version": "0.0.1",
+  "private": true,
+  "description": "흥행판 — 크랙 작품 통계 앱 (Tauri 시험판 v개발.000003)",
+  "scripts": {
+    "sync": "node scripts/sync-viewer.js",
+    "prep": "node scripts/prep-dist.js",
+    "dev": "npm run prep && tauri dev",
+    "build": "npm run prep && tauri build --no-bundle",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  },
+  "license": "MIT"
+}

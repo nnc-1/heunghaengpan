@@ -1,0 +1,235 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>흥행판</title><style>
+:root{--bg:#f6f6f4;--card:#fff;--fg:#1b1b1b;--sub:#6b6b6b;--line:#e2e2de;--acc:#c2410c;--chip:#efefeb;--up:#15803d;--flat:#9a9a9a;--hr:rgba(194,65,12,.07);--hc:rgba(194,65,12,.07);--hx:rgba(194,65,12,.16)}
+@media(prefers-color-scheme:dark){:root{--bg:#141414;--card:#1e1e1e;--fg:#ececec;--sub:#9a9a9a;--line:#2e2e2e;--acc:#fb923c;--chip:#2a2a2a;--up:#4ade80;--flat:#777;--hr:rgba(251,146,60,.10);--hc:rgba(251,146,60,.10);--hx:rgba(251,146,60,.22)}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.55 system-ui,"Malgun Gothic",sans-serif}
+header{background:var(--bg);border-bottom:1px solid var(--line);padding:10px 16px;z-index:2}
+h1{font-size:17px;margin:0 0 8px}.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+select,input,button{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit}
+button{cursor:pointer}input[type=search]{flex:1;min-width:140px}
+body{height:100vh;display:flex;flex-direction:column}#app{flex:1;min-height:0;display:grid;grid-template-columns:clamp(380px,30vw,780px) 1fr;gap:12px;padding:0 16px 12px}#left{overflow-y:auto;min-height:0;padding:12px 4px 12px 0}#right{min-height:0;display:flex;flex-direction:column;padding-top:12px}#left .sum{grid-template-columns:minmax(0,0.85fr) minmax(0,1fr) minmax(0,1fr)}.sum .card{padding:10px 10px}.sum .card ol{padding-left:12px}
+@media(max-width:1100px){body{height:auto;display:block}#app{display:block;padding:0 16px 40px}#left{overflow:visible}#right{display:block}#left .sum{grid-template-columns:1fr}}.count{color:var(--sub);font-size:13px;margin:6px 0 10px}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:8px 12px;text-align:center;color:var(--sub);margin:0 0 10px;font-size:13px}
+#empty{display:none;flex:1;border:2px dashed var(--line);border-radius:14px;align-items:center;justify-content:center;text-align:center;color:var(--sub);padding:40px;min-height:260px}#empty b{display:block;font-size:22px;color:var(--fg);margin-bottom:14px}#empty p{margin:4px 0;font-size:15px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:center;vertical-align:middle;white-space:nowrap}
+th:nth-child(2),td:nth-child(2){text-align:left}th:nth-child(n+4):nth-child(-n+10),td:nth-child(n+4):nth-child(-n+10){text-align:right}td:nth-child(2){white-space:normal;width:17.5em;min-width:17.5em;max-width:17.5em;overflow-wrap:anywhere}th{cursor:pointer;color:var(--sub);font-weight:600}
+td a{color:inherit;text-decoration:none}
+.l2{display:block;min-height:1.25em;font-size:12px;line-height:1.25}th .l2{font-size:12px;font-weight:500}th .hk{cursor:pointer}th .hk:hover{color:var(--fg);text-decoration:underline}
+.tg{display:inline-block;font-size:10.5px;border-radius:5px;padding:0 4px;margin:0 2px;line-height:1.3;white-space:nowrap}.tg.or{background:#2563eb;color:#fff}.tg.on{background:#7c3aed;color:#fff}
+td.kd{text-align:center}
+td>span:first-child:not(.nm):not(.badge){display:block;min-height:1.25em}td a:hover{text-decoration:underline}
+.badge{font-size:11px;border:1px solid var(--sub);color:var(--sub);border-radius:5px;padding:0 4px;margin-left:4px}
+.up{color:var(--up);font-weight:600}.flat{color:var(--flat)}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:10px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.card h3{margin:0 0 6px;font-size:13px;color:var(--sub)}.card ol{margin:0;padding-left:18px}.card li{display:flex;justify-content:space-between;gap:8px}
+.card li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tr{font-size:11px;padding:0 6px;margin-left:6px;border-radius:6px;color:var(--sub)}
+#chart{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0;display:none}
+#chint{display:none;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:26px 12px;margin:10px 0;text-align:center;font-size:17px;font-weight:600;color:var(--sub)}
+#twrap{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:0 12px;flex:1;min-height:0;overflow:auto}
+#twrap th{position:sticky;top:0;background:var(--card);z-index:1}
+#tbl tbody tr:hover td{background:var(--hr)}#tbl td.hc,#tbl th.hc{box-shadow:inset 0 0 0 999px var(--hc)}#tbl tbody tr:hover td.hc{box-shadow:inset 0 0 0 999px var(--hx)}
+#twrap tr:last-child td{border-bottom:0}
+#chart .seg{display:inline-flex;gap:0}#chart .seg button{border-radius:0;margin-left:-1px;padding:4px 10px}#chart .seg button:first-child{border-radius:8px 0 0 8px;margin-left:0}#chart .seg button:last-child{border-radius:0 8px 8px 0}#chart .seg button.on{background:var(--acc);border-color:var(--acc);color:#fff;position:relative}
+#chart .top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+#chart svg{width:100%;height:auto;display:block;margin-top:6px}
+</style></head><body>
+<header><h1>흥행판 · 작품 성장 추적</h1>
+<div class="count" id="count"></div><div class="count" style="margin-top:4px">⚠ 스냅샷은 하루 1~3번 정도로 받아주세요. 몇 분마다 반복해서 받으면 크랙이 요청을 막을 수 있어요. (비공식 API 사용)</div></header>
+<div id="app">
+<aside id="left">
+<div class="drop" id="drop">스냅샷 JSON 파일을 끌어다 놓거나 눌러서 선택하세요 (여러 개 가능)</div>
+<div class="card" id="mgr" style="margin:0 0 10px"></div>
+<div class="sum" id="sum"></div>
+<div id="chart"></div>
+<div id="chint">작품명을 누르면 추이 그래프가 열려요</div>
+</aside>
+<section id="right">
+<div id="empty"><div><b>스냅샷 JSON 파일을 끌어다 놓거나 눌러 선택하세요</b><p>① 크랙에서 흥행판 스크립트로 스냅샷을 받고</p><p>② 받은 .json 파일을 이 칸에 끌어다 놓거나, 이 칸을 눌러 선택하면</p><p>③ 작품별 표와 추이 그래프가 나타나요</p><p style="margin-top:12px;font-size:13px">두 개 이상 올리면 증가분을 비교할 수 있어요 · 여러 파일을 한꺼번에 놓아도 돼요</p></div></div>
+<div id="qbar" class="row" style="margin:0 0 10px">
+<select id="vis"><option value="public">공개만</option><option value="">전체</option><option value="private">비공개</option><option value="linkonly">링크공개</option></select>
+<select id="type"><option value="">스토리+캐릭터</option><option value="story">스토리만</option><option value="character">캐릭터만</option></select>
+<select id="adult"><option value="N">세이프</option><option value="Y">언세이프</option><option value="" selected>전체</option></select>
+<input type="search" id="q" placeholder="작품명 검색" style="flex:1;min-width:160px">
+</div>
+<div id="acct" class="card" style="display:none;margin:0 0 10px;padding:8px 14px"></div>
+<div id="twrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+</section>
+</div>
+<script>
+const $=s=>document.querySelector(s);let SNAPS=[];// [{date, map:{id:work}}]
+function addSnap(obj){
+ if(Array.isArray(obj.snapshots)){obj.snapshots.forEach(addSnap);return}
+ const date=obj.snapshot_id||obj.snapshot_date||obj.captured_at?.slice(0,10)||('무명'+SNAPS.length);
+ if(SNAPS.some(s=>s.date===date))SNAPS=SNAPS.filter(s=>s.date!==date);
+ const map={};(obj.works||[]).forEach(w=>map[w.id]=w);
+ SNAPS.push({date,map,account:obj.account||null});SNAPS.sort((a,b)=>a.date.localeCompare(b.date));
+ rebuildBase();save();render();drawMgr();
+}
+function save(){try{localStorage.setItem('hh_snaps',JSON.stringify(SNAPS.map(s=>({snapshot_date:s.date,works:Object.values(s.map),account:s.account}))))}catch(e){}}
+function rebuildBase(){}
+const readFiles=fl=>[...fl].forEach(f=>{const r=new FileReader();r.onload=()=>{try{addSnap(JSON.parse(r.result))}catch(x){alert(f.name+': 읽기 실패')}};r.readAsText(f)});
+const fpick=document.createElement('input');fpick.type='file';fpick.accept='.json,application/json';fpick.multiple=true;fpick.style.display='none';document.body.appendChild(fpick);
+fpick.onchange=()=>{readFiles(fpick.files);fpick.value=''};
+['#drop','#empty'].forEach(sel=>{const el=$(sel);el.style.cursor='pointer';el.onclick=()=>fpick.click();
+ el.ondragover=e=>{e.preventDefault();el.style.borderColor='var(--acc)'};
+ el.ondragleave=()=>el.style.borderColor='';
+ el.ondrop=e=>{e.preventDefault();el.style.borderColor='';readFiles(e.dataTransfer.files)}});
+let sortKey='msg',sortDir=-1;
+let kindIdx=0;
+function render(){
+ if(!SNAPS.length){$('#count').textContent='스냅샷을 올려주세요.';return;}
+ let latest=SNAPS[SNAPS.length-1];const vis=$('#vis').value,ty=$('#type').value,ad=$('#adult').value,q=$('#q').value.trim().toLowerCase();
+ let base=null;
+ if(SNAPS.length>1)base=SNAPS[SNAPS.length-2];
+ if(CMP){const A=SNAPS.find(x=>x.date===CMP[0]),B=SNAPS.find(x=>x.date===CMP[1]);if(A&&B){base=A;latest=B}else CMP=null}
+ Object.values(latest.map).forEach(w=>{w.r_room=w.chat?w.msg/w.chat:null;w.r_like=w.like?w.msg/w.like:null;w.kind=w.type==='character'?'캐릭터':w.adult?'언세이프':'세이프'});
+ const rows=Object.values(latest.map).filter(w=>(!vis||w.visibility===vis)&&(!ty||(w.type||'story')===ty)&&(!ad||(ad==='Y')===!!w.adult)&&(!q||w.name.toLowerCase().includes(q)));
+ const d=(w,k)=>{if(!base||!base.map[w.id])return null;const a=w[k],b=base.map[w.id][k];return(a==null||b==null)?null:a-b};
+ // 작품별 정산 추정: 계정 정산 증가분(같은 달일 때만)을 작품별 대화 증가 비율로 나눔 (캐시=오리지널 외, 현금=오리지널)
+ const sameMo=!!base&&base.date.slice(0,7)===latest.date.slice(0,7);
+ const pool=k=>{const a=latest.account,b=base&&base.account;if(!sameMo||!a||!b||a[k]==null||b[k]==null)return null;const v=a[k]-b[k];return v>0?v:null};
+ const poolC=pool('expectedCash'),poolM=pool('expectedMoney'),allW=Object.values(latest.map),ws={c:0,m:0};
+ allW.forEach(w=>{const v=Math.max(d(w,'msg')||0,0);if(w.original)ws.m+=v;else ws.c+=v});
+ allW.forEach(w=>{const v=Math.max(d(w,'msg')||0,0),m=!!w.original,p=m?poolM:poolC,sm=m?ws.m:ws.c;w.ek=m?'현금':'캐시';w.est=(p!=null&&sm>0&&base.map[w.id])?p*v/sm:null});
+ const KO=[['언세이프','캐릭터','세이프'],['캐릭터','언세이프','세이프']][kindIdx];
+ rows.sort((a,b)=>{if(sortKey==='kind')return KO.indexOf(a.kind)-KO.indexOf(b.kind)||(b.msg||0)-(a.msg||0);const av=sortKey.startsWith('d_')?(d(a,sortKey.slice(2))??-1):a[sortKey],bv=sortKey.startsWith('d_')?(d(b,sortKey.slice(2))??-1):b[sortKey];return typeof av==='string'||typeof bv==='string'?String(av||'').localeCompare(String(bv||''))*sortDir:((av??-1)-(bv??-1))*sortDir});
+ const H=(a,ak,b,bk)=>`<th><span class="hk" data-k="${ak}">${a}</span>${b?`<span class="l2"><span class="hk" data-k="${bk}">${b}</span></span>`:'<span class="l2"></span>'}</th>`;
+ $('#tbl thead').innerHTML='<tr>'+[H('타입','kind'),H('작품명','name'),H('상태','visibility'),H('대화수','msg','대화 증가','d_msg'),H('추정 수익','est'),H('좋아요','like','좋아요 증가','d_like'),H('댓글','comment','댓글 증가','d_comment'),H('대화방','chat','대화방 증가','d_chat'),H('방당 대화','r_room'),H('좋아요당 대화','r_like'),H('생성일','created')].join('')+'</tr>';
+ {const e=$('#tbl thead [data-k=est]');if(e)e.title='추정치예요. 비교한 두 기록 사이 계정 정산 증가분(같은 달일 때만)을 작품별 대화 증가 비율로 나눠요. 캐시는 오리지널 외 작품, 현금은 오리지널 작품에 나눠요. 추가 기능 사용량과 온리 가산은 반영되지 않아요.'}
+ $('#tbl thead').querySelectorAll('.hk').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k==='link')return;if(k==='kind'){kindIdx=sortKey==='kind'?(kindIdx+1)%2:0;sortKey='kind';render();return}if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=k==='name'||k==='created'?1:-1}render()});
+ const V={public:'공개',private:'비공개',linkonly:'링크'};
+ const fmt=n=>n==null?'':n.toLocaleString('ko-KR');const f1=n=>n==null?'':n.toLocaleString('ko-KR',{maximumFractionDigits:1});const dd=v=>v==null?'':v>0?`<span class="up">+${fmt(v)}</span>`:v<0?`<span>${fmt(v)}</span>`:'<span class="flat">0</span>';
+ const S2=(a,b)=>`<td><span>${a}</span><span class="l2">${b}</span></td>`;
+ const estC=w=>w.est==null?'<td><span class="flat">-</span><span class="l2 flat">'+w.ek+'</span></td>':`<td><span>≈${fmt(Math.round(w.est))}</span><span class="l2 flat">${w.ek}</span></td>`;
+ $('#tbl tbody').innerHTML=rows.map(w=>`<tr><td class="kd"><span class=badge style="margin:0">${w.kind}</span><span class="l2">${w.original?'<span class="tg or">오리지널</span>':''}${w.only?'<span class="tg on">온리</span>':''}</span></td><td><span class=nm data-id="${w.id}" style="cursor:pointer">${w.name}</span></td><td>${V[w.visibility]||w.visibility}</td>${S2(fmt(w.msg),dd(d(w,'msg')))}${estC(w)}${S2(fmt(w.like),dd(d(w,'like')))}${S2(fmt(w.comment),dd(d(w,'comment')))}${S2(fmt(w.chat),dd(d(w,'chat')))}<td>${f1(w.r_room)}</td><td>${f1(w.r_like)}</td><td class="kd"><span>${w.created||''}</span><span class="l2">${w.sourceId?`<a class=tr href="https://crack.wrtn.ai/${w.type==='character'?'characters/'+w.sourceId+'/detail':'detail/'+w.sourceId}" target="_blank" rel="noopener" style="border:1px solid var(--sub);text-decoration:none;white-space:nowrap">크랙에서 보기</a>`:''}</span></td></tr>`).join('');
+ try{hint()}catch(e){}
+ const ac=latest.account,acEl=$('#acct');
+ if(!ac||(ac.expectedCash==null&&ac.expectedMoney==null))acEl.style.display='none';
+ else{const bc=base&&base.account;
+  const sameMon=base&&latest.date.slice(0,7)===base.date.slice(0,7);const chip=(k,t)=>{if(ac[k]==null)return '';const dv=bc&&bc[k]!=null&&sameMon?ac[k]-bc[k]:null;const rs=bc&&bc[k]!=null&&!sameMon;return `<span data-ak="${k}" style="cursor:pointer" title="정산 예상은 매월 초 초기화돼요. 눌러서 추이 보기">${t} <b>${fmt(ac[k])}</b>${rs?' <span class="flat">(월 초기화)</span>':''}${dv==null?'':` (${dv>0?`<span class="up">+${fmt(dv)}</span>`:dv<0?`<span>-${fmt(-dv)}</span>`:'<span class="flat">0</span>'})`}</span>`};
+  acEl.innerHTML=`<b style="color:var(--sub);font-weight:600;margin-right:14px">계정 정산</b>`+[chip('expectedCash','정산 예상 캐시'),chip('expectedMoney','정산 예상 현금')].filter(Boolean).join('<span style="color:var(--line);margin:0 14px">|</span>');
+  acEl.style.display='block'}
+ const sm=$('#sum');
+ if(base){
+  const top=(k,t)=>{const a=rows.map(w=>({w,v:d(w,k)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v).slice(0,5);return `<div class=card><h3>${t}</h3>${a.length?'<ol>'+a.map(x=>`<li><span>${x.w.name}</span><span class=up>+${fmt(x.v)}</span></li>`).join('')+'</ol>':'<span class=flat>증가 없음</span>'}</div>`};
+  const tot=k=>rows.reduce((t,w)=>t+(d(w,k)||0),0);
+  sm.innerHTML=`<div class=card><h3>${base.date} →<br>${latest.date}<br>합계</h3>대화 <b class=up>+${fmt(tot('msg'))}</b><br>좋아요 <b class=up>+${fmt(tot('like'))}</b><br>댓글 <b class=up>+${fmt(tot('comment'))}</b></div>`+top('msg','대화 증가 TOP5')+top('like','좋아요 증가 TOP5');
+ }else sm.innerHTML='';
+ const label=base?(CMP?` · 비교 중: ${base.date} → ${latest.date}`:` · 기준 ${base.date} 대비 증가분`):' · 스냅샷 1개 (증가분은 2개 이상부터)';
+ $('#count').textContent=`${latest.date} 기준 ${rows.length}개${label}`;
+}
+let DEL=[],CMP=null,SEL=[],PG=0,MGR_OPEN=false,NOACCT=false;const PER=10;
+const DAY=86400000;
+function lastBefore(latest,ms){let c=null;SNAPS.forEach(x=>{if(x!==latest&&tms(x.date)<=tms(latest.date)-ms&&(!c||tms(x.date)>tms(c.date)))c=x});return c}
+function macros(){
+ const few=SNAPS.length<2,L=SNAPS[SNAPS.length-1]||{date:''},F=SNAPS[0]||{};
+ const sameDay=few?null:SNAPS.find(x=>x.date.slice(0,10)===L.date.slice(0,10));
+ return[
+  {k:'recent',t:'최근 두 기록',a:few?null:SNAPS[SNAPS.length-2],b:L,tip:'가장 최근 기록과 그 직전 기록'},
+  {k:'today',t:'오늘 첫 기록↔최근',a:sameDay&&sameDay!==L?sameDay:null,b:L,tip:'최근 기록과 같은 날의 첫 기록'},
+  {k:'d1',t:'하루 전↔최근',a:few?null:lastBefore(L,DAY),b:L,tip:'최근 기록보다 24시간 이상 이전의 가장 가까운 기록'},
+  {k:'d7',t:'일주일 전↔최근',a:few?null:lastBefore(L,7*DAY),b:L,tip:'7일 이상 이전의 가장 가까운 기록'},
+  {k:'d30',t:'한 달 전↔최근',a:few?null:lastBefore(L,30*DAY),b:L,tip:'30일 이상 이전의 가장 가까운 기록'},
+  {k:'all',t:'첫 기록↔최근',a:!few&&F!==L?F:null,b:L,tip:'가장 오래된 기록과 최근 기록 (전체 기간)'}
+ ];
+}
+function setCmp(a,b){const t=[a,b].sort((x,y)=>tms(x)-tms(y)||x.localeCompare(y));CMP=t;SEL=[t[0],t[1]];render();drawChart();drawMgr()}
+function emptyState(){const e=!SNAPS.length;if(e)$('#acct').style.display='none';$('#empty').style.display=e?'flex':'none';$('#qbar').style.display=e?'none':'';$('#twrap').style.display=e?'none':''}
+function drawMgr(){emptyState();
+ const m=$('#mgr');
+ const pages=Math.max(1,Math.ceil(SNAPS.length/PER));if(PG>=pages)PG=pages-1;
+ const all=[...SNAPS].reverse(),cur=all.slice(PG*PER,PG*PER+PER);
+ const rows=cur.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" data-sel="${x.date}"${SEL.includes(x.date)?' checked':''}><span>${x.date} <span style="color:var(--sub)">· 작품 ${Object.keys(x.map).length}개</span></span></label><span style="display:flex;align-items:center;gap:8px"><label title="지울 기록 체크" style="display:flex;align-items:center;cursor:pointer"><input type="checkbox" data-dsel="${x.date}"${DEL.includes(x.date)?' checked':''} style="accent-color:#dc2626"></label></span></div>`).join('');
+ DEL=DEL.filter(d=>SNAPS.some(x=>x.date===d));
+ const mc=macros().map(o=>{const ok=!!o.a;return `<button data-mac="${o.k}" title="${o.tip}"${ok?'':' style="opacity:.45"'}>${o.t}</button>`}).join(' ');
+ const can=SEL.length===2;
+ const top=`<div><b>저장된 기록 (${SNAPS.length}개)</b>${CMP?' <span class="up">· 비교 중</span>':''}</div>
+ <div style="margin:8px 0"><div class="count" style="margin:0 0 6px">빠른 비교: ${mc||'기록이 2개 이상일 때 쓸 수 있어요.'}</div></div>`;
+ const bar=`<div id="mttl" style="cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;padding:10px 12px;margin:6px 0;background:var(--chip);border:1px solid var(--line);border-radius:8px;font-size:13px" title="눌러서 목록 접기/펼치기"><span style="color:var(--sub)">${MGR_OPEN?'▾':'▸'}</span><b style="flex:1">선택 비교 / 기록 목록 관리</b><span style="color:var(--sub);font-size:12px">${MGR_OPEN?'접기':'펼치기'}</span></div>`;
+ if(!MGR_OPEN){m.innerHTML=top+bar;return}
+ m.innerHTML=top+bar
+ +`<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:2px 0 8px"><span>선택: ${SEL.length?SEL.join(' ↔ '):'체크박스로 기록 2개를 고르세요'}</span><button id="selclr"${SEL.length?'':' disabled'}>선택 해제</button></div>`
+ +`<div class="count" style="margin:0 0 6px">삭제는 이 화면의 저장 기록에서만 지워져요. 다운로드 폴더의 json 파일은 그대로 남고, 지운 기록은 되돌릴 수 없어요. 지우기 전에 <b>기록 내보내기</b>로 백업해 두면 안전해요.</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px"><button id="exp" title="쌓인 스냅샷 전부를 파일 하나로 저장">기록 내보내기</button><label style="display:flex;align-items:center;gap:6px;color:var(--sub);cursor:pointer"><input type="checkbox" id="noacct"${NOACCT?' checked':''}>정산 정보 빼고 내보내기</label><button id="dall" title="이 화면의 지울 기록 체크 전체 선택/해제"${SNAPS.length?'':' disabled'}>${DEL.length===SNAPS.length&&DEL.length?'지울 기록 체크 해제':'지울 기록 전체 체크'}</button><button id="delsel" title="오른쪽 빨간 체크박스로 고른 기록만 지우기"${DEL.length?'':' disabled'}>선택한 기록 지우기${DEL.length?' ('+DEL.length+'개)':''}</button><button id="clear" title="저장된 스냅샷 기록을 전부 지우기">전체 기록 지우기</button></div>`
+ +(rows?`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--sub);padding:2px 0 4px"><span>◀ 비교할 기록 (2개까지 체크)</span><span style="color:#dc2626">지울 기록 체크 ▶</span></div>`+rows:'<div class="count">저장된 기록이 없어요.</div>')
+ +(pages>1?`<div style="display:flex;justify-content:center;gap:10px;align-items:center;padding-top:8px;border-top:1px solid var(--line)"><button data-pg="-1"${PG?'':' disabled'}>이전</button><span>${PG+1} / ${pages}</span><button data-pg="1"${PG<pages-1?'':' disabled'}>다음</button></div>`:'');
+}
+$('#mgr').onchange=e=>{if(e.target.id==='noacct'){NOACCT=e.target.checked;return}const dd=e.target.dataset&&e.target.dataset.dsel;if(dd){DEL=DEL.filter(x=>x!==dd);if(e.target.checked)DEL.push(dd);drawMgr();return}const d=e.target.dataset&&e.target.dataset.sel;if(!d)return;
+ if(e.target.checked){SEL=SEL.filter(x=>x!==d);SEL.push(d);while(SEL.length>2)SEL.shift()}else SEL=SEL.filter(x=>x!==d);
+ if(SEL.length===2){setCmp(SEL[0],SEL[1]);return}
+ drawMgr()};
+$('#mgr').onclick=e=>{
+ const t=e.target,d=t.dataset||{};
+ if(t.id==='exp'){doExport();return}
+ if(t.id==='clear'){doClear();return}
+ if(t.id==='dall'){DEL=(DEL.length===SNAPS.length)?[]:SNAPS.map(x=>x.date);drawMgr();return}
+ if(t.id==='delsel'){if(!DEL.length)return;if(!confirm('선택한 기록 '+DEL.length+'개를 지울까요?\n'+DEL.join('\n')+'\n(다운로드 폴더의 json 파일은 지워지지 않아요)'))return;const ds=DEL.slice();SNAPS=SNAPS.filter(x=>!ds.includes(x.date));SEL=SEL.filter(x=>!ds.includes(x));DEL=[];if(CMP&&CMP.some(x=>ds.includes(x)))CMP=null;save();rebuildBase();if(!SNAPS.length){$('#tbl tbody').innerHTML='';$('#sum').innerHTML='';chartId=null}render();drawChart();drawMgr();return}
+ if(t.closest&&t.closest('#mttl')){MGR_OPEN=!MGR_OPEN;drawMgr();return}
+ if(t.id==='selclr'){SEL=[];const was=!!CMP;CMP=null;if(was){render();drawChart()}drawMgr();return}
+ if(d.pg){PG+=parseInt(d.pg,10);drawMgr();return}
+ if(d.mac){const o=macros().find(x=>x.k===d.mac);if(o&&!o.a){alert(SNAPS.length<2?'비교하려면 기록이 2개 이상 필요해요.':'이 비교에 맞는 기록이 없어요.\n'+o.tip);return}if(o&&o.a){if(o.k==='recent'){CMP=null;SEL=[];render();drawChart();drawMgr()}else setCmp(o.a.date,o.b.date)}return}
+ if(!d.del)return;
+ if(!confirm(d.del+' 기록을 지울까요?\n(다운로드 폴더의 json 파일은 지워지지 않아요)'))return;
+ SNAPS=SNAPS.filter(x=>x.date!==d.del);DEL=DEL.filter(x=>x!==d.del);SEL=SEL.filter(x=>x!==d.del);if(CMP&&CMP.includes(d.del))CMP=null;
+ save();rebuildBase();
+ if(!SNAPS.length){$('#tbl tbody').innerHTML='';$('#sum').innerHTML='';chartId=null}
+ render();drawChart();drawMgr();
+};
+let chartId=null,chartKey='msg';
+(function(){const t=$('#tbl');let cur=-1;
+ const set=i=>{if(i===cur)return;t.querySelectorAll('.hc').forEach(c=>c.classList.remove('hc'));cur=i;if(i<0)return;t.querySelectorAll('tr').forEach(r=>{const c=r.children[i];if(c)c.classList.add('hc')})};
+ t.addEventListener('mouseover',e=>{const c=e.target.closest&&e.target.closest('td,th');set(c?c.cellIndex:-1)});
+ t.addEventListener('mouseleave',()=>set(-1));
+ new MutationObserver(()=>{cur=-1}).observe(t,{childList:true,subtree:true});
+})();
+const tms=l=>{const m=String(l).match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2})[:\-](\d{2}))?/);return m?new Date(m[1]+'T'+(m[2]||'00')+':'+(m[3]||'00')+':00').getTime():0};
+const MET={msg:'대화수',like:'좋아요',comment:'댓글',chat:'대화방'};const AMET={expectedCash:'정산 예상 캐시',expectedMoney:'정산 예상 현금'};
+function openChart(id,key){chartId=id;chartKey=((id==='__acct'?AMET:MET)[key])?key:(id==='__acct'?'expectedCash':'msg');drawChart();{const L=$('#left');if(getComputedStyle(L).overflowY==='auto')L.scrollTo({top:0,behavior:'smooth'});else window.scrollTo({top:Math.max(0,$('#chart').getBoundingClientRect().top+scrollY-8),behavior:'smooth'})}}
+$('#tbl tbody').onclick=e=>{const b=e.target.closest('.nm');if(b)openChart(b.dataset.id,chartId==='__acct'?'msg':chartKey)};
+$('#acct').onclick=e=>{const b=e.target.closest('[data-ak]');if(b)openChart('__acct',b.dataset.ak)};
+function hint(){$('#chint').style.display=(!chartId&&SNAPS.length)?'block':'none'}
+function drawChart(){
+ const c=$('#chart');hint();if(!chartId){c.style.display='none';return}
+ const AC=chartId==='__acct',M=AC?AMET:MET;
+ const pts=AC?SNAPS.filter(s=>s.account&&s.account[chartKey]!=null).map(s=>({t:tms(s.date),d:s.date,v:s.account[chartKey],m:null})):SNAPS.filter(s=>s.map[chartId]&&s.map[chartId][chartKey]!=null).map(s=>({t:tms(s.date),d:s.date,v:s.map[chartId][chartKey],m:s.map[chartId].msg}));
+ const nm=AC?'계정 · 정산 예상':((SNAPS[SNAPS.length-1].map[chartId]||{}).name||'');
+ let h=`<div class=top><b>${nm}</b><span><span class=seg>${Object.entries(M).map(([k,v])=>`<button data-m=${k} class="${k===chartKey?'on':''}">${v}</button>`).join('')}</span> <button id=cx>닫기</button></span></div>`;
+ if(pts.length<2)h+=`<div class=count>${M[chartKey]} 기록이 ${pts.length}개뿐이라 그래프를 그릴 수 없어요. 스냅샷을 날짜별로 더 쌓아 주세요.</div>`;
+ else{
+  const W=640,H=250,L=52,R=14,T=14,B=30;const t0=pts[0].t,t1=pts[pts.length-1].t;
+  let lo=Math.min(...pts.map(p=>p.v)),hi=Math.max(...pts.map(p=>p.v));if(hi===lo){hi=lo+1}
+  const X=t=>L+(W-L-R)*(t1===t0?0:(t-t0)/(t1-t0)),Y=v=>T+(H-T-B)*(1-(v-lo)/(hi-lo));
+  const path=pts.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ');
+  h+=`<svg viewBox="0 0 ${W} ${H}"><g stroke="var(--line)"><line x1=${L} y1=${T} x2=${W-R} y2=${T}/><line x1=${L} y1=${H-B} x2=${W-R} y2=${H-B}/></g>
+  <g fill="var(--sub)" font-size=11><text x=${L-6} y=${T+4} text-anchor=end>${hi.toLocaleString('ko-KR')}</text><text x=${L-6} y=${H-B+4} text-anchor=end>${lo.toLocaleString('ko-KR')}</text><text x=${L} y=${H-8}>${pts[0].d}</text><text x=${W-R} y=${H-8} text-anchor=end>${pts[pts.length-1].d}</text></g>
+  <path d="${path}" fill=none stroke="var(--acc)" stroke-width=2 stroke-linejoin=round />${pts.map((p,i)=>`<circle cx=${X(p.t).toFixed(1)} cy=${Y(p.v).toFixed(1)} r=3.5 fill="var(--acc)" pointer-events=none /><circle data-i=${i} cx=${X(p.t).toFixed(1)} cy=${Y(p.v).toFixed(1)} r=11 fill=transparent style="cursor:pointer" />`).join('')}</svg>`;
+ }
+ c.innerHTML=h;c.style.display='block';c.style.position='relative';
+ const tip=document.createElement('div');
+ tip.style.cssText='position:absolute;display:none;pointer-events:none;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.5;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25);z-index:5';
+ c.appendChild(tip);
+ const f=n=>n==null?'-':n.toLocaleString('ko-KR');
+ c.querySelectorAll('circle[data-i]').forEach(el=>{
+  const p=pts[+el.dataset.i];
+  const show=ev=>{
+   const i=+el.dataset.i,dl=i>0?p.v-pts[i-1].v:null,reset=AC&&i>0&&p.d.slice(0,7)!==pts[i-1].d.slice(0,7);
+   tip.innerHTML=`<b>${p.d}</b><br>${M[chartKey]} ${f(p.v)}`+(reset?' (월 초기화)':dl==null?'':` (${dl>=0?'+':'-'}${f(Math.abs(dl))})`);
+   tip.style.display='block';
+   const r=c.getBoundingClientRect();let x=ev.clientX-r.left+14,y=ev.clientY-r.top+14;
+   if(x+tip.offsetWidth>r.width-4)x=ev.clientX-r.left-tip.offsetWidth-14;
+   tip.style.left=Math.max(4,x)+'px';tip.style.top=y+'px';
+  };
+  el.onmouseenter=show;el.onmousemove=show;el.onmouseleave=()=>{tip.style.display='none'};
+ });
+ c.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{chartKey=b.dataset.m;drawChart()});$('#cx').onclick=()=>{chartId=null;drawChart()};
+}
+function doExport(){if(!SNAPS.length){alert('내보낼 기록이 없어요.');return}
+ const out={format:'heunghengpan-all',exported_at:new Date().toISOString(),snapshots:SNAPS.map(s=>{const o={snapshot_date:s.date,works:Object.values(s.map)};if(s.account&&!NOACCT)o.account=s.account;return o})};
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(out)],{type:'application/json'}));
+ a.download='흥행판_전체기록_'+SNAPS[SNAPS.length-1].date+'.json';document.body.appendChild(a);a.click();a.remove()}
+function doClear(){if(confirm('이 브라우저에 저장된 스냅샷 기록을 지울까요? (json 파일은 그대로예요)')){try{localStorage.removeItem('hh_snaps')}catch(e){}SNAPS=[];chartId=null;rebuildBase();$('#tbl tbody').innerHTML='';$('#sum').innerHTML='';drawChart();render();drawMgr()}}
+['#vis','#type','#adult'].forEach(s=>$(s).onchange=render);$('#q').oninput=render;
+drawMgr();
+try{(JSON.parse(localStorage.getItem('hh_snaps')||'[]')).forEach(o=>addSnap(o))}catch(e){}
+</script></body></html>
