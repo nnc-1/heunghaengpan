@@ -10,7 +10,6 @@ select,input,button{background:var(--card);color:var(--fg);border:1px solid var(
 button{cursor:pointer}input[type=search]{flex:1;min-width:140px}
 body{height:100vh;display:flex;flex-direction:column}#app{flex:1;min-height:0;display:grid;grid-template-columns:clamp(380px,30vw,780px) 1fr;gap:12px;padding:0 16px 12px}#left{overflow-y:auto;min-height:0;padding:12px 4px 12px 0}#right{min-height:0;display:flex;flex-direction:column;padding-top:12px}#left .sum{grid-template-columns:minmax(0,0.85fr) minmax(0,1fr) minmax(0,1fr)}.sum .card{padding:10px 10px}.sum .card ol{padding-left:12px}
 @media(max-width:1100px){body{height:auto;display:block}#app{display:block;padding:0 16px 40px}#left{overflow:visible}#right{display:block}#left .sum{grid-template-columns:1fr}}.count{color:var(--sub);font-size:13px;margin:6px 0 10px}
-.drop{border:2px dashed var(--line);border-radius:10px;padding:8px 12px;text-align:center;color:var(--sub);margin:0 0 10px;font-size:13px}
 #empty{display:none;flex:1;border:2px dashed var(--line);border-radius:14px;align-items:center;justify-content:center;text-align:center;color:var(--sub);padding:40px;min-height:260px}#empty b{display:block;font-size:22px;color:var(--fg);margin-bottom:14px}#empty p{margin:4px 0;font-size:15px}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:center;vertical-align:middle;white-space:nowrap}
 th:nth-child(2),td:nth-child(2){text-align:left}th:nth-child(n+4):nth-child(-n+11),td:nth-child(n+4):nth-child(-n+11){text-align:right}td:nth-child(2){white-space:normal;width:17.5em;min-width:17.5em;max-width:17.5em;overflow-wrap:anywhere}th{cursor:pointer;color:var(--sub);font-weight:600}
@@ -40,14 +39,13 @@ td>span:first-child:not(.nm):not(.badge){display:block;min-height:1.25em}td a:ho
 <div class="count" id="count"></div><div class="count" style="margin-top:4px">⚠ 스냅샷은 하루 1~3번 정도로 받아주세요. 몇 분마다 반복해서 받으면 크랙이 요청을 막을 수 있어요. (비공식 API 사용)</div></header>
 <div id="app">
 <aside id="left">
-<div class="drop" id="drop">스냅샷 JSON 파일을 끌어다 놓거나 눌러서 선택하세요 (여러 개 가능)</div>
 <div class="card" id="mgr" style="margin:0 0 10px"></div>
 <div class="sum" id="sum"></div>
 <div id="chart"></div>
 <div id="chint">작품명을 누르면 추이 그래프가 열려요</div>
 </aside>
 <section id="right">
-<div id="empty"><div><b>스냅샷 JSON 파일을 끌어다 놓거나 눌러 선택하세요</b><p>① 크랙에서 흥행판 스크립트로 스냅샷을 받고</p><p>② 받은 .json 파일을 이 칸에 끌어다 놓거나, 이 칸을 눌러 선택하면</p><p>③ 작품별 표와 추이 그래프가 나타나요</p><p style="margin-top:12px;font-size:13px">두 개 이상 올리면 증가분을 비교할 수 있어요 · 여러 파일을 한꺼번에 놓아도 돼요</p></div></div>
+<div id="empty"><div><b>아직 스냅샷이 없어요</b><p>① 위의 <b>크랙 페이지 열기</b>에서 크랙에 로그인하고</p><p>② <b>스냅샷 받기</b>를 누르면</p><p>③ 작품별 표와 추이 그래프가 나타나요</p><p style="margin-top:12px;font-size:13px">두 번 이상 받으면 증가분과 그래프를 볼 수 있어요</p></div></div>
 <div id="qbar" class="row" style="margin:0 0 10px">
 <select id="vis"><option value="public">공개만</option><option value="">전체</option><option value="private">비공개</option><option value="linkonly">링크공개</option></select>
 <select id="type"><option value="">스토리+캐릭터</option><option value="story">스토리만</option><option value="character">캐릭터만</option></select>
@@ -107,17 +105,10 @@ function updateLedger(){
  if(ch){saveLedger();render()}
 }
 function rebuildBase(){clearTimeout(LT);LT=setTimeout(updateLedger,400)}
-const readFiles=fl=>[...fl].forEach(f=>{const r=new FileReader();r.onload=()=>{try{addSnap(JSON.parse(r.result))}catch(x){alert(f.name+': 읽기 실패')}};r.readAsText(f)});
-const fpick=document.createElement('input');fpick.type='file';fpick.accept='.json,application/json';fpick.multiple=true;fpick.style.display='none';document.body.appendChild(fpick);
-fpick.onchange=()=>{readFiles(fpick.files);fpick.value=''};
-['#drop','#empty'].forEach(sel=>{const el=$(sel);el.style.cursor='pointer';el.onclick=()=>fpick.click();
- el.ondragover=e=>{e.preventDefault();el.style.borderColor='var(--acc)'};
- el.ondragleave=()=>el.style.borderColor='';
- el.ondrop=e=>{e.preventDefault();el.style.borderColor='';readFiles(e.dataTransfer.files)}});
 let sortKey='msg',sortDir=-1;
 let kindIdx=0,spIdx=0;
 function render(){
- if(!SNAPS.length){$('#count').textContent='스냅샷을 올려주세요.';return;}
+ if(!SNAPS.length){$('#count').textContent='아직 스냅샷이 없어요.';return;}
  let latest=SNAPS[SNAPS.length-1];const vis=$('#vis').value,ty=$('#type').value,ad=$('#adult').value,q=$('#q').value.trim().toLowerCase();
  let base=null;
  if(SNAPS.length>1)base=SNAPS[SNAPS.length-2];
