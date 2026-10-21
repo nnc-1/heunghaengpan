@@ -2,7 +2,7 @@
   "name": "heunghaengpan-tauri",
   "version": "0.0.1",
   "private": true,
-  "description": "흥행판 — 크랙 작품 통계 앱 (Tauri 시험판 v개발.000006)",
+  "description": "흥행판 — 크랙 작품 통계 앱 (Tauri 시험판 v개발.000007)",
   "scripts": {
     "sync": "node scripts/sync-viewer.js",
     "prep": "node scripts/prep-dist.js",

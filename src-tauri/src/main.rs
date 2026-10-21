@@ -1,4 +1,4 @@
-// 흥행판 (Tauri 시험판 v개발.000006)
+// 흥행판 (Tauri 시험판 v개발.000007)
 // 넉넉한 취향이 클로드와 함께 만들었어요.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -250,7 +250,7 @@ async fn crack_login(app: AppHandle) -> Result<(), String> {
     }
     let url: Url = Url::parse(CRACK_URL).map_err(|e| e.to_string())?;
     WebviewWindowBuilder::new(&app, "crack", WebviewUrl::External(url))
-        .title("크랙 로그인 — 로그인 후 이 창을 닫고 '스냅샷 받기'를 누르세요")
+        .title("크랙 — 로그인과 로그아웃은 이 창에서 하세요. 다 되면 창을 닫아도 돼요")
         .inner_size(1000.0, 800.0)
         .build()
         .map_err(|e| e.to_string())?;
@@ -291,36 +291,6 @@ async fn crack_token(app: AppHandle) -> Result<String, String> {
 #[tauri::command]
 fn crack_window_open(app: AppHandle) -> bool {
     app.get_webview_window("crack").is_some()
-}
-
-/// 크랙 로그아웃: 크랙 창의 쿠키와 저장소를 지운다 (앱의 다른 데이터는 건드리지 않음).
-#[tauri::command]
-async fn crack_logout(app: AppHandle) -> Result<(), String> {
-    let url: Url = Url::parse(CRACK_URL).map_err(|e| e.to_string())?;
-    let (win, created) = match app.get_webview_window("crack") {
-        Some(w) => (w, false),
-        None => (
-            WebviewWindowBuilder::new(&app, "crack", WebviewUrl::External(url.clone()))
-                .title("크랙")
-                .visible(false)
-                .build()
-                .map_err(|e| e.to_string())?,
-            true,
-        ),
-    };
-    if created {
-        tokio_sleep(600).await;
-    }
-    let cookies = win.cookies_for_url(url).map_err(|e| e.to_string())?;
-    for c in cookies {
-        let _ = win.delete_cookie(c);
-    }
-    let _ = win.eval("try{localStorage.clear();sessionStorage.clear()}catch(e){}");
-    tokio_sleep(300).await;
-    if created {
-        let _ = win.close();
-    }
-    Ok(())
 }
 
 async fn tokio_sleep(ms: u64) {
@@ -370,7 +340,6 @@ fn main() {
             http_get,
             crack_login,
             crack_token,
-            crack_logout,
             crack_window_open,
             selftest_enabled,
             selftest_log,
@@ -378,7 +347,7 @@ fn main() {
         ])
         .setup(|app| {
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("흥행판 · v개발.000006")
+                .title("흥행판 · v개발.000007")
                 .inner_size(1600.0, 900.0)
                 .min_inner_size(900.0, 600.0)
                 .disable_drag_drop_handler()

@@ -88,7 +88,7 @@
     // 4) 작품 링크는 기본 브라우저로 열기
     document.addEventListener('click', e => {
       const a = e.target.closest && e.target.closest('a[target=_blank]');
-      if (a) { e.preventDefault(); call('open_in_app', { url: a.href }).catch(() => call('open_url', { url: a.href }).catch(() => {})); }
+      if (a) { e.preventDefault(); call('open_in_app', { url: a.href }).then(() => watchLogin()).catch(() => call('open_url', { url: a.href }).catch(() => {})); }
     }, true);
 
     addBar();
@@ -148,8 +148,12 @@
     };
     const snapBtn = mk('스냅샷 받기', () => takeSnapshotUI(snapBtn), true);
     snapBtnRef = snapBtn; refreshLock(); setInterval(refreshLock, 20000);
-    loginBtn = mk('크랙 로그인 확인 중…', onLoginBtn);
-    loginBtn.disabled = true;
+    loginBtn = mk('크랙 페이지 열기', onLoginBtn);
+    loginBtn.title = '크랙 페이지가 앱 안에서 열려요. 로그인과 로그아웃은 그 페이지에서 해 주세요.';
+    loginState = document.createElement('span');
+    loginState.style.cssText = 'color:var(--sub);font-size:13px';
+    loginState.textContent = '로그인 확인 중…';
+    bar.appendChild(loginState);
     setTimeout(refreshLogin, 300);
     mk('저장 폴더 열기', () => call('open_folder').catch(e => alert(String(e))));
     statusEl = document.createElement('span');
@@ -159,37 +163,29 @@
     c.insertAdjacentElement('afterend', bar);
     const by = document.createElement('div');
     by.style.cssText = 'color:var(--sub);font-size:12px;margin:2px 0 0';
-    by.textContent = '넉넉한 취향이 클로드와 함께 만들었어요 · v개발.000006 (Tauri 시험판)';
+    by.textContent = '넉넉한 취향이 클로드와 함께 만들었어요 · v개발.000007 (Tauri 시험판)';
     h.appendChild(by);
   }
 
-  // ---------- 크랙 로그인 / 로그아웃 (버튼 하나로 상태에 따라 바뀜) ----------
-  let loginBtn = null, loggedIn = false, loginPoll = null;
+  // ---------- 크랙 페이지 열기 (로그인·로그아웃은 그 페이지에서 직접) + 로그인 상태 표시 ----------
+  let loginBtn = null, loginState = null, loggedIn = false, loginPoll = null;
   async function refreshLogin() {
     if (!loginBtn) return;
     try { loggedIn = !!(await call('crack_token')); } catch (e) { loggedIn = false; }
-    loginBtn.textContent = loggedIn ? '크랙 로그아웃' : '크랙 로그인';
-    loginBtn.disabled = false;
+    if (loginState) loginState.textContent = loggedIn ? '· 크랙 로그인됨' : '· 크랙 로그인 안 됨 (크랙 페이지 열기에서 로그인)';
     return loggedIn;
   }
-  function watchLogin() { // 로그인 창이 열려 있는 동안만 3초마다 확인, 창이 닫히면 마지막으로 한 번 더 확인
+  function watchLogin() { // 크랙 창이 열려 있는 동안 3초마다 로그인 상태 확인, 창이 닫히면 멈춤
     if (loginPoll) return;
     loginPoll = setInterval(async () => {
       let open = false;
       try { open = await call('crack_window_open'); } catch (e) {}
       const ok = await refreshLogin();
-      if (!open || ok) { clearInterval(loginPoll); loginPoll = null; }
+      if (!open) { clearInterval(loginPoll); loginPoll = null; } // 창이 열려 있는 동안 계속 확인 (그 안에서 로그아웃해도 반영)
     }, 3000);
   }
   async function onLoginBtn() {
-    if (loggedIn) {
-      if (!confirm('크랙에서 로그아웃할까요?\n(저장된 스냅샷 파일은 그대로예요. 다시 받으려면 로그인해야 해요.)')) return;
-      loginBtn.disabled = true; loginBtn.textContent = '로그아웃 중…';
-      try { await call('crack_logout'); } catch (e) { alert('로그아웃하지 못했어요: ' + e); }
-      await refreshLogin();
-    } else {
-      try { await call('crack_login'); watchLogin(); } catch (e) { alert(String(e)); }
-    }
+    try { await call('crack_login'); watchLogin(); } catch (e) { alert(String(e)); }
   }
 
   // ---------- 스냅샷 간격 락 ----------
@@ -340,8 +336,7 @@
       SNAPS = SNAPS.filter(s => s.date !== '2026-10-22 12:34'); window.save(); await sleep(400);
       rep.afterDelete = (await call('list_snapshots')).map(f => f.name).filter(n => n.includes('12-34'));
       try { rep.token = (await call('crack_token')).length; } catch (e) { rep.tokenErr = String(e); }
-      try { await call('crack_logout'); rep.logout = 'ok'; rep.openAfter = await call('crack_window_open'); } catch (e) { rep.logoutErr = String(e).slice(0, 80); }
-      rep.loginBtn = loginBtn && loginBtn.textContent;
+      rep.loginBtn = loginBtn && loginBtn.textContent; rep.loginState = loginState && loginState.textContent;
       try { await call('http_get', { url: 'https://example.com/', token: '' }); rep.badUrl = 'allowed?!'; } catch (e) { rep.badUrl = 'blocked'; }
       try { const r = await call('http_get', { url: API + '/content/me?limit=1', token: '' }); rep.api = r.status; } catch (e) { rep.apiErr = String(e).slice(0, 60); }
       await call('selftest_report', { text: JSON.stringify(rep) });
