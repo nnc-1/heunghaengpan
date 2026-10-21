@@ -1,4 +1,4 @@
-// 흥행판 (Tauri 시험판 v개발.000007)
+// 흥행판 (Tauri 시험판 v개발.000008)
 // 넉넉한 취향이 클로드와 함께 만들었어요.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -293,6 +293,18 @@ fn crack_window_open(app: AppHandle) -> bool {
     app.get_webview_window("crack").is_some()
 }
 
+/// 앱 안 브라우저(크랙·구글 로그인 포함)의 쿠키·캐시·저장소를 Tauri 기본 기능으로 한꺼번에 지운다.
+/// 스냅샷과 장부 파일(exe 옆 폴더)은 건드리지 않는다.
+#[tauri::command]
+async fn clear_login_data(app: AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("crack") {
+        let _ = w.close();
+        tokio_sleep(400).await;
+    }
+    let main = app.get_webview_window("main").ok_or("앱 창을 찾지 못했어요")?;
+    main.clear_all_browsing_data().map_err(|e| e.to_string())
+}
+
 async fn tokio_sleep(ms: u64) {
     tauri::async_runtime::spawn_blocking(move || std::thread::sleep(Duration::from_millis(ms)))
         .await
@@ -341,13 +353,14 @@ fn main() {
             crack_login,
             crack_token,
             crack_window_open,
+            clear_login_data,
             selftest_enabled,
             selftest_log,
             selftest_report
         ])
         .setup(|app| {
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("흥행판 · v개발.000007")
+                .title("흥행판 · v개발.000008")
                 .inner_size(1600.0, 900.0)
                 .min_inner_size(900.0, 600.0)
                 .disable_drag_drop_handler()

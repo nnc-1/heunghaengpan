@@ -155,6 +155,7 @@
     loginState.textContent = '로그인 확인 중…';
     bar.appendChild(loginState);
     setTimeout(refreshLogin, 300);
+    mk('앱 로그인 정보 지우기', onClearLogin);
     mk('저장 폴더 열기', () => call('open_folder').catch(e => alert(String(e))));
     statusEl = document.createElement('span');
     statusEl.style.cssText = 'color:var(--sub);font-size:13px';
@@ -163,7 +164,7 @@
     c.insertAdjacentElement('afterend', bar);
     const by = document.createElement('div');
     by.style.cssText = 'color:var(--sub);font-size:12px;margin:2px 0 0';
-    by.textContent = '넉넉한 취향이 클로드와 함께 만들었어요 · v개발.000007 (Tauri 시험판)';
+    by.textContent = '넉넉한 취향이 클로드와 함께 만들었어요 · v개발.000008 (Tauri 시험판)';
     h.appendChild(by);
   }
 
@@ -186,6 +187,15 @@
   }
   async function onLoginBtn() {
     try { await call('crack_login'); watchLogin(); } catch (e) { alert(String(e)); }
+  }
+
+  async function onClearLogin() {
+    if (!confirm('앱 안 크랙 창에 남은 로그인 정보(크랙·구글 등)와 캐시를 모두 지울까요?\n(스냅샷과 장부 파일은 그대로예요. 다시 쓰려면 크랙 페이지 열기에서 로그인해야 해요.)')) return;
+    let keep = null; try { keep = localStorage.getItem('hh_block_until'); } catch (e) {}
+    try { await call('clear_login_data'); } catch (e) { alert('지우지 못했어요: ' + e); return; }
+    try { if (keep) localStorage.setItem('hh_block_until', keep); } catch (e) {} // 접속 제한 시간은 유지
+    await refreshLogin();
+    alert('지웠어요.');
   }
 
   // ---------- 스냅샷 간격 락 ----------
@@ -336,6 +346,7 @@
       SNAPS = SNAPS.filter(s => s.date !== '2026-10-22 12:34'); window.save(); await sleep(400);
       rep.afterDelete = (await call('list_snapshots')).map(f => f.name).filter(n => n.includes('12-34'));
       try { rep.token = (await call('crack_token')).length; } catch (e) { rep.tokenErr = String(e); }
+      try { await call('clear_login_data'); rep.clear = 'ok'; rep.snapsAfterClear = (await call('list_snapshots')).length; } catch (e) { rep.clearErr = String(e).slice(0, 80); }
       rep.loginBtn = loginBtn && loginBtn.textContent; rep.loginState = loginState && loginState.textContent;
       try { await call('http_get', { url: 'https://example.com/', token: '' }); rep.badUrl = 'allowed?!'; } catch (e) { rep.badUrl = 'blocked'; }
       try { const r = await call('http_get', { url: API + '/content/me?limit=1', token: '' }); rep.api = r.status; } catch (e) { rep.apiErr = String(e).slice(0, 60); }
