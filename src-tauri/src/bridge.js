@@ -217,8 +217,8 @@
 
   // ---------- 스냅샷 받기 ----------
   let blockedStatus = null;
-  async function getJson(url, token) {
-    const r = await call('http_get', { url, token });
+  async function getJson(url, token, timeoutSec) {
+    const r = await call('http_get', { url, token, timeoutSec: timeoutSec || null });
     if (r.status === 403 || r.status === 429) { blockedStatus = r.status; throw new Error('BLOCKED ' + r.status); }
     let json = null;
     try { json = JSON.parse(r.body); } catch (e) {}
@@ -272,17 +272,24 @@
     }
     if (blockedStatus) throw new Error('BLOCKED ' + blockedStatus);
     // 계정 정산 예상 정보 (실패해도 작품 스냅샷은 그대로 저장)
-    let account = null;
-    try {
-      progress('정산 정보 읽는 중…');
-      const rv = await getJson(`${API}/creators/me/revenue`, token);
-      if (rv.status === 200) {
-        const d = (rv.json && rv.json.data) || {};
-        const n = v => (typeof v === 'number' && isFinite(v)) ? v : null;
-        account = { expectedCash: n(d.expectedCash), expectedMoney: n(d.expectedMoney), monthlySuperChat: n(d.monthlySuperChat) };
-        if (Object.values(account).every(v => v === null)) account = null;
+    // 정산 응답은 느릴 때가 있어서 오래 기다리고, 실패하면 두 번까지 다시 시도
+    let account = null, accountWhy = '';
+    for (let t = 1; t <= 3 && !account; t++) {
+      try {
+        progress(t === 1 ? '정산 정보 읽는 중… (오래 걸릴 수 있어요)' : `정산 정보 다시 읽는 중… (${t}/3)`);
+        const rv = await getJson(`${API}/creators/me/revenue`, token, 60);
+        if (rv.status === 200) {
+          const d = (rv.json && rv.json.data) || {};
+          const n = v => (typeof v === 'number' && isFinite(v)) ? v : null;
+          account = { expectedCash: n(d.expectedCash), expectedMoney: n(d.expectedMoney), monthlySuperChat: n(d.monthlySuperChat) };
+          if (Object.values(account).every(v => v === null)) { account = null; accountWhy = '응답에 정산 값이 없음'; }
+        } else accountWhy = '응답 ' + rv.status;
+      } catch (e) {
+        if (blockedStatus) throw new Error('BLOCKED ' + blockedStatus);
+        accountWhy = /timed? ?out|시간/i.test(String(e)) ? '응답 시간 초과' : String(e).slice(0, 60);
       }
-    } catch (e) { account = null; }
+      if (!account && t < 3) await sleep(3000);
+    }
     if (blockedStatus) throw new Error('BLOCKED ' + blockedStatus);
     const now = new Date();
     const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
@@ -296,7 +303,7 @@
         created: ((e && e.createdAt) || x.createdAt || '').slice(0, 10),
       };
     });
-    return { snap: { snapshot_date: date, snapshot_id: sid, captured_at: now.toISOString(), count: works.length, account, works }, listed, filled, failed: tried - filled };
+    return { snap: { snapshot_date: date, snapshot_id: sid, captured_at: now.toISOString(), count: works.length, account, works }, listed, filled, failed: tried - filled, accountWhy };
   }
 
   let busy = false;
@@ -318,7 +325,7 @@
       window.addSnap(res.snap); // 화면에 넣으면서 폴더에도 저장됨
       seen(Date.parse(res.snap.captured_at));
       setStatus(`스냅샷 ${res.snap.count}개 저장 (${res.snap.snapshot_id})`);
-      alert(`스냅샷 ${res.snap.count}개 저장 완료! (${res.snap.snapshot_id})\n대화방 수/생성일: 목록 ${res.listed}개 + 상세 ${res.filled}개 확인` + `\n정산 정보: ${res.snap.account ? '저장됨' : '받지 못함'}` + (res.failed ? `\n상세 보충 실패 ${res.failed}개` : '') + '\n\n⚠ 스냅샷은 하루 1~3번 정도로 받아주세요. 몇 분마다 반복해서 받으면 크랙이 요청을 막을 수 있어요. (비공식 API 사용)');
+      alert(`스냅샷 ${res.snap.count}개 저장 완료! (${res.snap.snapshot_id})\n대화방 수/생성일: 목록 ${res.listed}개 + 상세 ${res.filled}개 확인` + `\n정산 정보: ${res.snap.account ? '저장됨' : `받지 못함 (${res.accountWhy || '이유 모름'}) — 추정 수익은 다음 스냅샷에서 이어서 계산돼요`}` + (res.failed ? `\n상세 보충 실패 ${res.failed}개` : '') + '\n\n⚠ 스냅샷은 하루 1~3번 정도로 받아주세요. 몇 분마다 반복해서 받으면 크랙이 요청을 막을 수 있어요. (비공식 API 사용)');
     } catch (e) {
       if (/^BLOCKED/.test(String(e.message || e))) {
         try { localStorage.setItem('hh_block_until', String(Date.now() + BLOCK_HOURS * 3600000)); } catch (x) {}

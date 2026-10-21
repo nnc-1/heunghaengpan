@@ -219,12 +219,12 @@ struct HttpRes {
 
 /// 크랙 API GET 요청 (브라우저의 CORS 제한을 피하려고 앱 뒤쪽에서 호출).
 #[tauri::command]
-async fn http_get(url: String, token: String) -> Result<HttpRes, String> {
+async fn http_get(url: String, token: String, timeout_sec: Option<u64>) -> Result<HttpRes, String> {
     if !url.starts_with(API_PREFIX) {
         return Err("크랙 API 주소만 호출할 수 있어요".into());
     }
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(timeout_sec.unwrap_or(15).clamp(5, 90)))
         .build()
         .map_err(|e| e.to_string())?;
     let mut req = client

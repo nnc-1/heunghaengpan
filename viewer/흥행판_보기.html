@@ -86,9 +86,11 @@ function interval(a,b){
  return{from:a.date,to:b.date,cross:!same,poolC:pc,poolM:pm,w};
 }
 function updateLedger(){
- if(!SNAPS.length)return;let ch=false,start=0;
- if(!LEDGER.last){LEDGER.last=mini(SNAPS[0]);start=1;ch=true}
- for(let i=start;i<SNAPS.length;i++){const sn=SNAPS[i];if(sn.date<=LEDGER.last.date)continue;LEDGER.entries.push(interval(LEDGER.last,sn));LEDGER.last=mini(sn);ch=true}
+ if(!SNAPS.length)return;let ch=false;
+ // 정산 정보가 없는 기록은 구간 경계로 쓰지 않음. 예전에 그런 기록에서 끝난 빈 구간은 되돌려서 앞 기록부터 다시 계산
+ while(LEDGER.last&&!LEDGER.last.account&&LEDGER.entries.length){const e=LEDGER.entries[LEDGER.entries.length-1];if(e.to!==LEDGER.last.date)break;const prev=SNAPS.find(x=>x.date===e.from);if(!prev)break;LEDGER.entries.pop();LEDGER.last=mini(prev);ch=true}
+ if(!LEDGER.last){LEDGER.last=mini(SNAPS.find(x=>x.account)||SNAPS[0]);ch=true}
+ for(const sn of SNAPS){if(sn.date<=LEDGER.last.date||!sn.account)continue;LEDGER.entries.push(interval(LEDGER.last,sn));LEDGER.last=mini(sn);ch=true}
  if(ch){saveLedger();render()}
 }
 function rebuildBase(){clearTimeout(LT);LT=setTimeout(updateLedger,400)}
@@ -133,10 +135,12 @@ const cumM={};let cumC=0,cumMo=0,crossN=0;
  $('#tbl tbody').innerHTML=rows.map(w=>`<tr><td class="kd"><span class=badge style="margin:0">${w.kind}</span><span class="l2">${w.original?'<span class="tg or">오리지널</span>':''}${w.only?'<span class="tg on">온리</span>':''}</span></td><td><span class=nm data-id="${w.id}" style="cursor:pointer">${w.name}</span></td><td>${V[w.visibility]||w.visibility}</td>${S2(fmt(w.msg),dd(d(w,'msg')))}${estC(w)}${cumC2(w)}${S2(fmt(w.like),dd(d(w,'like')))}${S2(fmt(w.comment),dd(d(w,'comment')))}${S2(fmt(w.chat),dd(d(w,'chat')))}<td>${f1(w.r_room)}</td><td>${f1(w.r_like)}</td><td class="kd"><span>${w.created||''}</span><span class="l2">${w.sourceId?`<a class=tr href="https://crack.wrtn.ai/${w.type==='character'?'characters/'+w.sourceId+'/detail':'detail/'+w.sourceId}" target="_blank" rel="noopener" style="border:1px solid var(--sub);text-decoration:none;white-space:nowrap">크랙에서 보기</a>`:''}</span></td></tr>`).join('');
  try{hint()}catch(e){}
  const ac=latest.account,acEl=$('#acct');
- if(!ac||(ac.expectedCash==null&&ac.expectedMoney==null))acEl.style.display='none';
+ const cumH=(LEDGER.entries.length?`<span title="스냅샷 사이 정산 증가분을 이어서 더한 값이에요. 달이 바뀐 구간은 월말에 받은 뒤의 증가분이 빠졌을 수 있어요." style="cursor:help">누적 추정 캐시 <b>${fmt(Math.round(cumC))}</b> · 현금 <b>${fmt(Math.round(cumMo))}</b>${crossN?` <span class="flat">(누락 가능 ${crossN}구간)</span>`:''}</span>`:'');
+ const noAc=!ac||(ac.expectedCash==null&&ac.expectedMoney==null);
+ if(noAc){if(!cumH&&!SNAPS.some(x=>x.account))acEl.style.display='none';else{acEl.innerHTML=`<b style="color:var(--sub);font-weight:600;margin-right:14px">계정 정산</b><span class="flat" title="정산 정보 요청이 실패한 기록이에요. 추정 수익은 정산 정보가 있는 두 기록 사이에서만 계산돼요. 수익 장부는 이 기록을 건너뛰고 다음 기록에서 이어서 계산해요." style="cursor:help">${latest.date} 기록은 정산 정보를 받지 못했어요</span>`+(cumH?'<span style="color:var(--line);margin:0 14px">|</span>'+cumH:'');acEl.style.display='block'}}
  else{const bc=base&&base.account;
   const sameMon=base&&latest.date.slice(0,7)===base.date.slice(0,7);const chip=(k,t)=>{if(ac[k]==null)return '';const dv=bc&&bc[k]!=null&&sameMon?ac[k]-bc[k]:null;const rs=bc&&bc[k]!=null&&!sameMon;return `<span data-ak="${k}" style="cursor:pointer" title="정산 예상은 매월 초 초기화돼요. 눌러서 추이 보기">${t} <b>${fmt(ac[k])}</b>${rs?' <span class="flat">(월 초기화)</span>':''}${dv==null?'':` (${dv>0?`<span class="up">+${fmt(dv)}</span>`:dv<0?`<span>-${fmt(-dv)}</span>`:'<span class="flat">0</span>'})`}</span>`};
-  acEl.innerHTML=`<b style="color:var(--sub);font-weight:600;margin-right:14px">계정 정산</b>`+[chip('expectedCash','정산 예상 캐시'),chip('expectedMoney','정산 예상 현금')].filter(Boolean).join('<span style="color:var(--line);margin:0 14px">|</span>')+(LEDGER.entries.length?`<span style="color:var(--line);margin:0 14px">|</span><span title="스냅샷 사이 정산 증가분을 이어서 더한 값이에요. 달이 바뀐 구간은 월말에 받은 뒤의 증가분이 빠졌을 수 있어요." style="cursor:help">누적 추정 캐시 <b>${fmt(Math.round(cumC))}</b> · 현금 <b>${fmt(Math.round(cumMo))}</b>${crossN?` <span class="flat">(누락 가능 ${crossN}구간)</span>`:''}</span>`:'');
+  acEl.innerHTML=`<b style="color:var(--sub);font-weight:600;margin-right:14px">계정 정산</b>`+[chip('expectedCash','정산 예상 캐시'),chip('expectedMoney','정산 예상 현금')].filter(Boolean).join('<span style="color:var(--line);margin:0 14px">|</span>')+(cumH?'<span style="color:var(--line);margin:0 14px">|</span>'+cumH:'');
   acEl.style.display='block'}
  const sm=$('#sum');
  if(base){
@@ -205,7 +209,7 @@ $('#mgr').onclick=e=>{
  if(!SNAPS.length){$('#tbl tbody').innerHTML='';$('#sum').innerHTML='';chartId=null}
  render();drawChart();drawMgr();
 };
-let chartId=null,chartKey='msg';
+let chartId=null;const chartOn={w:['msg','like','comment','chat'],a:['expectedCash','expectedMoney']};
 (function(){const t=$('#tbl');let cur=-1;
  const set=i=>{if(i===cur)return;t.querySelectorAll('.hc').forEach(c=>c.classList.remove('hc'));cur=i;if(i<0)return;t.querySelectorAll('tr').forEach(r=>{const c=r.children[i];if(c)c.classList.add('hc')})};
  t.addEventListener('mouseover',e=>{const c=e.target.closest&&e.target.closest('td,th');set(c?c.cellIndex:-1)});
@@ -214,44 +218,62 @@ let chartId=null,chartKey='msg';
 })();
 const tms=l=>{const m=String(l).match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2})[:\-](\d{2}))?/);return m?new Date(m[1]+'T'+(m[2]||'00')+':'+(m[3]||'00')+':00').getTime():0};
 const MET={msg:'대화수',like:'좋아요',comment:'댓글',chat:'대화방'};const AMET={expectedCash:'정산 예상 캐시',expectedMoney:'정산 예상 현금'};
-function openChart(id,key){chartId=id;chartKey=((id==='__acct'?AMET:MET)[key])?key:(id==='__acct'?'expectedCash':'msg');drawChart();{const L=$('#left');if(getComputedStyle(L).overflowY==='auto')L.scrollTo({top:0,behavior:'smooth'});else window.scrollTo({top:Math.max(0,$('#chart').getBoundingClientRect().top+scrollY-8),behavior:'smooth'})}}
-$('#tbl tbody').onclick=e=>{const b=e.target.closest('.nm');if(b)openChart(b.dataset.id,chartId==='__acct'?'msg':chartKey)};
+// 그래프: 한 작품(또는 계정)의 항목들을 위아래로 쌓아서 그림. 각 줄은 자기 눈금, 가로(시간)는 공통. 항목 버튼으로 줄을 켜고 끔.
+const MCOL={msg:'var(--acc)',like:'#e64980',comment:'#2f9e44',chat:'#4c8bf5',expectedCash:'#f08c00',expectedMoney:'#2f9e44'};
+function openChart(id,key){const was=chartId;chartId=id;if(id==='__acct'&&key&&!chartOn.a.includes(key))chartOn.a.push(key);drawChart();
+ if(!was){const L=$('#left');if(getComputedStyle(L).overflowY==='auto')L.scrollTo({top:0,behavior:'smooth'});else window.scrollTo({top:Math.max(0,$('#chart').getBoundingClientRect().top+scrollY-8),behavior:'smooth'})}}
+$('#tbl tbody').onclick=e=>{const b=e.target.closest('.nm');if(b)openChart(b.dataset.id)};
 $('#acct').onclick=e=>{const b=e.target.closest('[data-ak]');if(b)openChart('__acct',b.dataset.ak)};
 function hint(){$('#chint').style.display=(!chartId&&SNAPS.length)?'block':'none'}
 function drawChart(){
- const c=$('#chart');hint();if(!chartId){c.style.display='none';return}
- const AC=chartId==='__acct',M=AC?AMET:MET;
- const pts=AC?SNAPS.filter(s=>s.account&&s.account[chartKey]!=null).map(s=>({t:tms(s.date),d:s.date,v:s.account[chartKey],m:null})):SNAPS.filter(s=>s.map[chartId]&&s.map[chartId][chartKey]!=null).map(s=>({t:tms(s.date),d:s.date,v:s.map[chartId][chartKey],m:s.map[chartId].msg}));
+ const c=$('#chart');hint();if(chartId&&chartId!=='__acct'&&!SNAPS.some(s=>s.map[chartId]))chartId=null;if(!chartId){c.style.display='none';return}
+ const AC=chartId==='__acct',M=AC?AMET:MET,ON=chartOn[AC?'a':'w'],keys=Object.keys(M).filter(k=>ON.includes(k));
  const nm=AC?'계정 · 정산 예상':((SNAPS[SNAPS.length-1].map[chartId]||{}).name||'');
- let h=`<div class=top><b>${nm}</b><span><span class=seg>${Object.entries(M).map(([k,v])=>`<button data-m=${k} class="${k===chartKey?'on':''}">${v}</button>`).join('')}</span> <button id=cx>닫기</button></span></div>`;
- if(pts.length<2)h+=`<div class=count>${M[chartKey]} 기록이 ${pts.length}개뿐이라 그래프를 그릴 수 없어요. 스냅샷을 날짜별로 더 쌓아 주세요.</div>`;
+ const esc=t=>String(t).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+ const f=n=>n==null?'-':n.toLocaleString('ko-KR');
+ const rowsD=keys.map(k=>({k,pts:AC?SNAPS.filter(s=>s.account&&s.account[k]!=null).map(s=>({t:tms(s.date),d:s.date,v:s.account[k]})):SNAPS.filter(s=>s.map[chartId]&&s.map[chartId][k]!=null).map(s=>({t:tms(s.date),d:s.date,v:s.map[chartId][k]}))}));
+ const TS=[...new Set(rowsD.flatMap(r=>r.pts.map(p=>p.t)))].sort((a,b)=>a-b);
+ c.style.display='block';const W=Math.round(Math.max(320,Math.min(900,(c.clientWidth||640)-26))),L=118,R=14; // 실제 칸 너비에 맞춰 글자가 작아지지 않게
+ let h=`<div class=top><b>${esc(nm)}</b><span><span class=seg>${Object.entries(M).map(([k,v])=>`<button data-m=${k} class="${ON.includes(k)?'on':''}" title="눌러서 이 줄 ${ON.includes(k)?'숨기기':'보이기'}">${v}</button>`).join('')}</span> <button id=cx>닫기</button></span></div>`;
+ if(TS.length<2)h+=`<div class=count>기록이 1개뿐이라 그래프를 그릴 수 없어요. 스냅샷을 날짜별로 더 쌓아 주세요.</div>`;
  else{
-  const W=640,H=250,L=52,R=14,T=14,B=30;const t0=pts[0].t,t1=pts[pts.length-1].t;
-  let lo=Math.min(...pts.map(p=>p.v)),hi=Math.max(...pts.map(p=>p.v));if(hi===lo){hi=lo+1}
-  const X=t=>L+(W-L-R)*(t1===t0?0:(t-t0)/(t1-t0)),Y=v=>T+(H-T-B)*(1-(v-lo)/(hi-lo));
-  const path=pts.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ');
-  h+=`<svg viewBox="0 0 ${W} ${H}"><g stroke="var(--line)"><line x1=${L} y1=${T} x2=${W-R} y2=${T}/><line x1=${L} y1=${H-B} x2=${W-R} y2=${H-B}/></g>
-  <g fill="var(--sub)" font-size=11><text x=${L-6} y=${T+4} text-anchor=end>${hi.toLocaleString('ko-KR')}</text><text x=${L-6} y=${H-B+4} text-anchor=end>${lo.toLocaleString('ko-KR')}</text><text x=${L} y=${H-8}>${pts[0].d}</text><text x=${W-R} y=${H-8} text-anchor=end>${pts[pts.length-1].d}</text></g>
-  <path d="${path}" fill=none stroke="var(--acc)" stroke-width=2 stroke-linejoin=round />${pts.map((p,i)=>`<circle cx=${X(p.t).toFixed(1)} cy=${Y(p.v).toFixed(1)} r=3.5 fill="var(--acc)" pointer-events=none /><circle data-i=${i} cx=${X(p.t).toFixed(1)} cy=${Y(p.v).toFixed(1)} r=11 fill=transparent style="cursor:pointer" />`).join('')}</svg>`;
+  const T=6,RH=58,GAP=12,B=24,n=rowsD.length,H=T+n*RH+(n-1)*GAP+B;
+  const t0=TS[0],t1=TS[TS.length-1],X=t=>L+(W-L-R)*(t1===t0?0:(t-t0)/(t1-t0));
+  h+=`<svg viewBox="0 0 ${W} ${H}">`;
+  rowsD.forEach((r,i)=>{const y0=T+i*(RH+GAP),col=MCOL[r.k]||'var(--acc)';
+   if(!r.pts.length){h+=`<text x=4 y=${y0+16} font-size=12 fill="var(--sub)">${M[r.k]}</text><text x=${L} y=${y0+RH/2} font-size=11 fill="var(--sub)">기록 없음</text>`;return}
+   const vs=r.pts.map(p=>p.v),lo=Math.min(...vs),hi=Math.max(...vs),flat=hi===lo,Y=v=>flat?y0+RH/2:y0+5+(RH-10)*(1-(v-lo)/(hi-lo)),last=r.pts[r.pts.length-1];
+   h+=`<line x1=${L} y1=${y0+RH} x2=${W-R} y2=${y0+RH} stroke="var(--line)"/>`;
+   h+=`<text x=4 y=${y0+15} font-size=12 fill="${col}" font-weight=700>${M[r.k]}</text><text x=4 y=${y0+33} font-size=13 fill="var(--fg)" font-weight=700>${f(last.v)}</text><text x=4 y=${y0+49} font-size=10 fill="var(--sub)">${flat?'변화 없음':'범위 '+f(lo)+'~'+f(hi)}</text>`;
+   h+=`<path d="${r.pts.map((p,j)=>(j?'L':'M')+X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ')}" fill=none stroke="${col}" stroke-width=2 stroke-linejoin=round />`+r.pts.map(p=>`<circle cx=${X(p.t).toFixed(1)} cy=${Y(p.v).toFixed(1)} r=3 fill="${col}"/>`).join('');
+  });
+  h+=`<g fill="var(--sub)" font-size=11><text x=${L} y=${H-6}>${SNAPS.find(s=>tms(s.date)===t0).date}</text><text x=${W-R} y=${H-6} text-anchor=end>${SNAPS.find(s=>tms(s.date)===t1).date}</text></g>`;
+  h+=`<line id=vl x1=0 y1=${T} x2=0 y2=${H-B} stroke="var(--sub)" stroke-dasharray="3 3" style="display:none" pointer-events=none />`;
+  TS.forEach((t,i)=>{const a=i?(X(TS[i-1])+X(t))/2:L-6,b=i<TS.length-1?(X(t)+X(TS[i+1]))/2:W-R+6;h+=`<rect data-t=${i} x=${a.toFixed(1)} y=${T} width=${(b-a).toFixed(1)} height=${H-B-T} fill=transparent style="cursor:crosshair"/>`});
+  h+='</svg>';
  }
  c.innerHTML=h;c.style.display='block';c.style.position='relative';
  const tip=document.createElement('div');
- tip.style.cssText='position:absolute;display:none;pointer-events:none;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.5;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25);z-index:5';
+ tip.style.cssText='position:absolute;display:none;pointer-events:none;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.6;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25);z-index:5';
  c.appendChild(tip);
- const f=n=>n==null?'-':n.toLocaleString('ko-KR');
- c.querySelectorAll('circle[data-i]').forEach(el=>{
-  const p=pts[+el.dataset.i];
+ const vl=c.querySelector('#vl'),svg=c.querySelector('svg');
+ c.querySelectorAll('rect[data-t]').forEach(el=>{
+  const t=TS[+el.dataset.t];
   const show=ev=>{
-   const i=+el.dataset.i,dl=i>0?p.v-pts[i-1].v:null,reset=AC&&i>0&&p.d.slice(0,7)!==pts[i-1].d.slice(0,7);
-   tip.innerHTML=`<b>${p.d}</b><br>${M[chartKey]} ${f(p.v)}`+(reset?' (월 초기화)':dl==null?'':` (${dl>=0?'+':'-'}${f(Math.abs(dl))})`);
-   tip.style.display='block';
-   const r=c.getBoundingClientRect();let x=ev.clientX-r.left+14,y=ev.clientY-r.top+14;
-   if(x+tip.offsetWidth>r.width-4)x=ev.clientX-r.left-tip.offsetWidth-14;
-   tip.style.left=Math.max(4,x)+'px';tip.style.top=y+'px';
+   const t0=TS[0],t1=TS[TS.length-1],x=L+(W-L-R)*(t1===t0?0:(t-t0)/(t1-t0));vl.setAttribute('x1',x);vl.setAttribute('x2',x);vl.style.display='';
+   let d='';const lines=rowsD.map(r=>{const j=r.pts.findIndex(p=>p.t===t);if(j<0)return `<span style="color:${MCOL[r.k]}">●</span> ${M[r.k]} -`;const p=r.pts[j],pv=j?r.pts[j-1]:null;d=p.d;const reset=AC&&pv&&p.d.slice(0,7)!==pv.d.slice(0,7),dl=pv?p.v-pv.v:null;
+    return `<span style="color:${MCOL[r.k]}">●</span> ${M[r.k]} <b>${f(p.v)}</b>`+(reset?' <span style="opacity:.7">(월 초기화)</span>':dl==null?'':` <span style="opacity:.75">${dl>0?'+':dl<0?'-':'±'}${f(Math.abs(dl))}</span>`)});
+   tip.innerHTML=`<b>${d}</b><br>`+lines.join('<br>');tip.style.display='block';
+   const r=c.getBoundingClientRect();let tx=ev.clientX-r.left+16,ty=ev.clientY-r.top+14;
+   if(tx+tip.offsetWidth>r.width-4)tx=ev.clientX-r.left-tip.offsetWidth-16;
+   if(ty+tip.offsetHeight>r.height-4)ty=Math.max(4,ev.clientY-r.top-tip.offsetHeight-12);
+   tip.style.left=Math.max(4,tx)+'px';tip.style.top=ty+'px';
   };
-  el.onmouseenter=show;el.onmousemove=show;el.onmouseleave=()=>{tip.style.display='none'};
+  el.onmouseenter=show;el.onmousemove=show;
  });
- c.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{chartKey=b.dataset.m;drawChart()});$('#cx').onclick=()=>{chartId=null;drawChart()};
+ if(svg)svg.onmouseleave=()=>{tip.style.display='none';vl.style.display='none'};
+ c.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{const k=b.dataset.m,i=ON.indexOf(k);if(i>=0){if(ON.length>1)ON.splice(i,1)}else ON.push(k);drawChart()});
+ $('#cx').onclick=()=>{chartId=null;drawChart()};
 }
 function doExport(){if(!SNAPS.length){alert('내보낼 기록이 없어요.');return}
  const out={format:'heunghengpan-all',exported_at:new Date().toISOString(),snapshots:SNAPS.map(s=>{const o={snapshot_date:s.date,works:Object.values(s.map)};if(s.account&&!NOACCT)o.account=s.account;return o})};
