@@ -32,6 +32,7 @@ td>span:first-child:not(.nm):not(.badge){display:block;min-height:1.25em}td a:ho
 #tbl tbody tr:hover td{background:var(--hr)}#tbl td.hc,#tbl th.hc{box-shadow:inset 0 0 0 999px var(--hc)}#tbl tbody tr:hover td.hc{box-shadow:inset 0 0 0 999px var(--hx)}
 #twrap tr:last-child td{border-bottom:0}
 #chart .seg{display:inline-flex;gap:0}#chart .seg button{border-radius:0;margin-left:-1px;padding:4px 10px}#chart .seg button:first-child{border-radius:8px 0 0 8px;margin-left:0}#chart .seg button:last-child{border-radius:0 8px 8px 0}#chart .seg button.on{background:var(--acc);border-color:var(--acc);color:#fff;position:relative}
+#chart .modes{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:12px}#chart .modes .seg button{padding:2px 8px;font-size:12px}
 #chart .top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 #chart svg{width:100%;height:auto;display:block;margin-top:6px}
 </style></head><body>
@@ -85,7 +86,7 @@ function interval(a,b){
  // 같은 달: 두 값의 차이 / 달이 바뀜: 새 달 1일부터 쌓인 값(직전 달 말의 증가분은 알 수 없음)
  const pool=k=>{if(!bc||bc[k]==null)return null;if(same){if(!ac||ac[k]==null)return null;return Math.max(bc[k]-ac[k],0)}return Math.max(bc[k],0)};
  const pc=pool('expectedCash'),pm=pool('expectedMoney'),w={};
- Object.values(b.map).forEach(x=>{const m=!!x.original,p=m?pm:pc,sm=m?ws.m:ws.c,v=wt[x.id];if(p!=null&&sm>0&&v>0){const amt=Math.round(p*v/sm*10)/10;w[x.id]=m?[0,amt]:[amt,0]}});
+ Object.values(b.map).forEach(x=>{const m=!!x.original,p=m?pm:pc,sm=m?ws.m:ws.c,v=wt[x.id];if(p!=null&&sm>0&&v>0){const amt=p*v/sm;w[x.id]=m?[0,amt]:[amt,0]}});
  return{from:a.date,to:b.date,cross:!same,poolC:pc,poolM:pm,w};
 }
 function periods(){const A=SNAPS.filter(x=>x.account),E=[];for(let i=1;i<A.length;i++)E.push(interval(A[i-1],A[i]));return E}
@@ -117,9 +118,11 @@ function render(){
 const cumM={},PER_=periods();let cumC=0,cumMo=0,crossN=0;
  // 크랙이 대화수를 늦게 집계해 대화 증가 없이 정산만 오른 구간은, 그 금액을 다음에 대화가 늘어난 구간의 작품 비율로 넘겨서 나눔
  const pend=[0,0];
- PER_.forEach(e=>{if(e.cross)crossN++;cumC+=e.poolC||0;cumMo+=e.poolM||0;const ids=Object.keys(e.w||{}),sm=[0,0];ids.forEach(id=>{sm[0]+=e.w[id][0];sm[1]+=e.w[id][1]});
+ PER_.forEach(e=>{if(e.cross)crossN++;const ids=Object.keys(e.w||{}),sm=[0,0];ids.forEach(id=>{sm[0]+=e.w[id][0];sm[1]+=e.w[id][1]});
   ids.forEach(id=>{const c=cumM[id]=cumM[id]||[0,0];for(const i of [0,1])c[i]+=e.w[id][i]+(sm[i]>0?pend[i]*e.w[id][i]/sm[i]:0)});
   [e.poolC,e.poolM].forEach((p,i)=>{if(sm[i]>0)pend[i]=0;if(p>0&&!(sm[i]>0))pend[i]+=p})});
+ // 계정 누적은 작품별 누적의 합으로 (어긋남 없게). 아직 나눌 대화 증가가 없는 금액은 '배분 대기'로 따로 표시
+ Object.values(cumM).forEach(c=>{cumC+=c[0];cumMo+=c[1]});
  allW.forEach(w=>{const c=cumM[w.id];w.cum=c?(w.original?c[1]:c[0]):null});
  const S2=(a,b)=>`<td><span>${a}</span><span class="l2">${b}</span></td>`;
  const estC=w=>w.est==null?'<td><span class="flat">-</span><span class="l2 flat">'+w.ek+'</span></td>':`<td><span>≈${fmt(Math.round(w.est))}</span><span class="l2 flat">${w.ek}</span></td>`;
@@ -127,7 +130,7 @@ const cumM={},PER_=periods();let cumC=0,cumMo=0,crossN=0;
  $('#tbl tbody').innerHTML=rows.map(w=>`<tr><td class="kd"><span class=badge style="margin:0">${w.kind}</span><span class="l2">${w.original?'<span class="tg or">오리지널</span>':''}${w.only?'<span class="tg on">온리</span>':''}</span></td><td><span class=nm data-id="${w.id}" style="cursor:pointer">${w.name}</span></td><td>${V[w.visibility]||w.visibility}</td>${S2(fmt(w.msg),dd(d(w,'msg')))}${estC(w)}${cumC2(w)}${S2(fmt(w.like),dd(d(w,'like')))}${S2(fmt(w.comment),dd(d(w,'comment')))}${S2(fmt(w.chat),dd(d(w,'chat')))}<td>${f1(w.r_room)}</td><td>${f1(w.r_like)}</td><td class="kd"><span>${w.created||''}</span><span class="l2">${w.sourceId?`<a class=tr href="https://crack.wrtn.ai/${w.type==='character'?'characters/'+w.sourceId+'/detail':'detail/'+w.sourceId}" target="_blank" rel="noopener" style="border:1px solid var(--sub);text-decoration:none;white-space:nowrap">크랙에서 보기</a>`:''}</span></td></tr>`).join('');
  try{hint()}catch(e){}
  const ac=latest.account,acEl=$('#acct');
- const cumH=(PER_.length?`<span title="스냅샷 사이 정산 증가분을 이어서 더한 값이에요. 달이 바뀐 구간은 월말에 받은 뒤의 증가분이 빠졌을 수 있어요." style="cursor:help">누적 추정 캐시 <b>${fmt(Math.round(cumC))}</b> · 현금 <b>${fmt(Math.round(cumMo))}</b>${crossN?` <span class="flat">(누락 가능 ${crossN}구간)</span>`:''}</span>`:'');
+ const cumH=(PER_.length?`<span title="작품별 누적 추정 수익의 합이에요. 달이 바뀐 구간은 월말에 받은 뒤의 증가분이 빠졌을 수 있어요." style="cursor:help">누적 추정 캐시 <b>${fmt(Math.round(cumC))}</b> · 현금 <b>${fmt(Math.round(cumMo))}</b>${pend[0]+pend[1]>0?` <span class="flat" title="대화수가 아직 집계되지 않아 작품에 나누지 못한 정산 증가분이에요. 다음에 대화가 늘어난 기록에서 작품별로 나눠요.">(배분 대기 캐시 ${fmt(Math.round(pend[0]))}${pend[1]?' · 현금 '+fmt(Math.round(pend[1])):''})</span>`:''}${crossN?` <span class="flat">(누락 가능 ${crossN}구간)</span>`:''}</span>`:'');
  const noAc=!ac||(ac.expectedCash==null&&ac.expectedMoney==null);
  if(noAc){if(!cumH&&!SNAPS.some(x=>x.account))acEl.style.display='none';else{acEl.innerHTML=`<b style="color:var(--sub);font-weight:600;margin-right:14px">계정 정산</b><span class="flat" title="정산 정보 요청이 실패한 기록이에요. 추정 수익은 정산 정보가 있는 두 기록 사이에서만 계산돼요. 누적 수익은 이 기록을 건너뛰고 앞뒤 기록으로 이어서 계산해요." style="cursor:help">${latest.date} 기록은 정산 정보를 받지 못했어요</span>`+(cumH?'<span style="color:var(--line);margin:0 14px">|</span>'+cumH:'');acEl.style.display='block'}}
  else{const bc=base&&base.account;
@@ -227,6 +230,20 @@ let chartId=null;const chartOn={w:['msg','like','comment','chat'],a:['expectedCa
 const tms=l=>{const m=String(l).match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2})[:\-](\d{2}))?/);return m?new Date(m[1]+'T'+(m[2]||'00')+':'+(m[3]||'00')+':00').getTime():0};
 const MET={msg:'대화수',like:'좋아요',comment:'댓글',chat:'대화방'};const AMET={expectedCash:'정산 예상 캐시',expectedMoney:'정산 예상 현금'};
 // 그래프: 한 작품(또는 계정)의 항목들을 위아래로 쌓아서 그림. 각 줄은 자기 눈금, 가로(시간)는 공통. 항목 버튼으로 줄을 켜고 끔.
+// 줄마다 보기 방식: cum 누적(선) / seg 구간별 증가(막대) / day 하루당 증가(자정 기준 막대). 이 PC에 기억
+let chartMode={};try{chartMode=JSON.parse(localStorage.getItem('hh_cmode')||'{}')||{}}catch(e){}
+const CMODES=[['cum','누적'],['seg','구간별 증가'],['day','하루당 증가']];
+// 정산 예상은 매달 초기화되므로, 달이 바뀐 구간은 새 달 값만큼 늘었다고 보고 이어 붙인 값(acc)을 만든다
+function unroll(pts,AC){let a=0;return pts.map((p,j)=>{const pv=pts[j-1],cross=AC&&pv&&p.d.slice(0,7)!==pv.d.slice(0,7);a=j?a+(cross?p.v:p.v-pv.v):p.v;return{...p,acc:a,cross}})}
+function segBars(pts){return pts.slice(1).map((p,j)=>({a:pts[j].t,b:p.t,v:p.acc-pts[j].acc,faint:p.cross,lab:pts[j].d+' → '+p.d}))}
+function dayBars(pts){
+ const F=t=>{let j=1;while(j<pts.length-1&&pts[j].t<t)j++;const a=pts[j-1],b=pts[j];return b.t===a.t?b.acc:a.acc+(b.acc-a.acc)*(t-a.t)/(b.t-a.t)},out=[];
+ const t0=pts[0].t,tN=pts[pts.length-1].t;let d=new Date(t0);d.setHours(0,0,0,0);
+ while(d.getTime()<tN){const s=d.getTime(),n=new Date(d);n.setDate(n.getDate()+1);const e=n.getTime(),a=Math.max(s,t0),b=Math.min(e,tN);
+  const cnt=pts.filter(p=>p.t>=s&&p.t<e).length,part=a>s||b<e;
+  // 그날 기록이 하나뿐이거나 하루를 다 덮지 못한 날은 앞뒤 구간을 시간 비율로 나눈 추정치라 엷게
+  out.push({a,b,v:F(b)-F(a),faint:cnt<2||part||pts.some((p,j)=>j&&p.cross&&p.t>=s&&p.t<e),lab:`${d.getMonth()+1}/${d.getDate()}`+(part?' (일부)':'')});d=n}
+ return out}
 const MCOL={msg:'var(--acc)',like:'#e64980',comment:'#2f9e44',chat:'#4c8bf5',expectedCash:'#f08c00',expectedMoney:'#2f9e44'};
 function openChart(id,key){const was=chartId;chartId=id;if(id==='__acct'&&key&&!chartOn.a.includes(key))chartOn.a.push(key);drawChart();
  if(!was){const L=$('#left');if(getComputedStyle(L).overflowY==='auto')L.scrollTo({top:0,behavior:'smooth'});else window.scrollTo({top:Math.max(0,$('#chart').getBoundingClientRect().top+scrollY-8),behavior:'smooth'})}}
@@ -240,9 +257,11 @@ function drawChart(){
  const esc=t=>String(t).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
  const f=n=>n==null?'-':n.toLocaleString('ko-KR');
  const rowsD=keys.map(k=>({k,pts:AC?SNAPS.filter(s=>s.account&&s.account[k]!=null).map(s=>({t:tms(s.date),d:s.date,v:s.account[k]})):SNAPS.filter(s=>s.map[chartId]&&s.map[chartId][k]!=null).map(s=>({t:tms(s.date),d:s.date,v:s.map[chartId][k]}))}));
+ rowsD.forEach(r=>{r.pts=unroll(r.pts,AC);r.mode=r.pts.length>1&&chartMode[r.k]||'cum';r.bars=r.mode==='seg'?segBars(r.pts):r.mode==='day'?dayBars(r.pts):null});
  const TS=[...new Set(rowsD.flatMap(r=>r.pts.map(p=>p.t)))].sort((a,b)=>a-b);
  c.style.display='block';const W=Math.round(Math.max(320,Math.min(900,(c.clientWidth||640)-26))),L=118,R=14; // 실제 칸 너비에 맞춰 글자가 작아지지 않게
  let h=`<div class=top><b>${esc(nm)}</b><span><span class=seg>${Object.entries(M).map(([k,v])=>`<button data-m=${k} class="${ON.includes(k)?'on':''}" title="눌러서 이 줄 ${ON.includes(k)?'숨기기':'보이기'}">${v}</button>`).join('')}</span> <button id=cx>닫기</button></span></div>`;
+ if(TS.length>1)h+=`<div class=modes>${rowsD.map(r=>`<span><span style="color:${MCOL[r.k]};font-weight:700">${M[r.k]}</span> <span class=seg>${CMODES.map(([m,t])=>`<button data-cm="${r.k}:${m}" class="${r.mode===m?'on':''}">${t}</button>`).join('')}</span></span>`).join('')}</div>`;
  if(TS.length<2)h+=`<div class=count>기록이 1개뿐이라 그래프를 그릴 수 없어요. 스냅샷을 날짜별로 더 쌓아 주세요.</div>`;
  else{
   const T=6,GAP=12,B=24,n=rowsD.length,AREA=4*58+3*GAP,RH=(AREA-(n-1)*GAP)/n,H=T+AREA+B; // 항목 수와 상관없이 전체 높이는 같고, 줄 높이를 나눠 가짐
@@ -250,8 +269,14 @@ function drawChart(){
   h+=`<svg viewBox="0 0 ${W} ${H}">`;
   rowsD.forEach((r,i)=>{const y0=T+i*(RH+GAP),col=MCOL[r.k]||'var(--acc)';
    if(!r.pts.length){h+=`<text x=4 y=${y0+16} font-size=12 fill="var(--sub)">${M[r.k]}</text><text x=${L} y=${y0+RH/2} font-size=11 fill="var(--sub)">기록 없음</text>`;return}
-   const vs=r.pts.map(p=>p.v),lo=Math.min(...vs),hi=Math.max(...vs),flat=hi===lo,Y=v=>flat?y0+RH/2:y0+5+(RH-10)*(1-(v-lo)/(hi-lo)),last=r.pts[r.pts.length-1];
+   const last=r.pts[r.pts.length-1];
    h+=`<line x1=${L} y1=${y0+RH} x2=${W-R} y2=${y0+RH} stroke="var(--line)"/>`;
+   if(r.bars){
+    const bv=r.bars.map(x=>x.v),lo=Math.min(0,...bv),hi=Math.max(0,...bv),Y=v=>hi===lo?y0+RH:y0+5+(RH-10)*(1-(v-lo)/(hi-lo)),fx=n=>(n>0?'+':'')+f(Math.round(n));
+    h+=`<text x=4 y=${y0+15} font-size=12 fill="${col}" font-weight=700>${M[r.k]}</text><text x=4 y=${y0+33} font-size=13 fill="var(--fg)" font-weight=700>${fx(r.bars[r.bars.length-1].v)}</text><text x=4 y=${y0+49} font-size=10 fill="var(--sub)">${r.mode==='day'?'하루당':'구간별'} · 최고 ${fx(hi)}</text>`;
+    r.bars.forEach(x=>{const xa=X(x.a),xb=X(x.b),w=Math.max(1.5,xb-xa-1.5),ya=Y(Math.max(x.v,0)),yb=Y(Math.min(x.v,0));h+=`<rect x=${(xa+0.75).toFixed(1)} y=${ya.toFixed(1)} width=${w.toFixed(1)} height=${Math.max(0.5,yb-ya).toFixed(1)} fill="${col}" opacity="${x.faint?0.35:0.9}" pointer-events=none><title>${x.lab}: ${fx(x.v)}${x.faint?' (추정)':''}</title></rect>`});
+    return}
+   const vs=r.pts.map(p=>p.v),lo=Math.min(...vs),hi=Math.max(...vs),flat=hi===lo,Y=v=>flat?y0+RH/2:y0+5+(RH-10)*(1-(v-lo)/(hi-lo));
    h+=`<text x=4 y=${y0+15} font-size=12 fill="${col}" font-weight=700>${M[r.k]}</text><text x=4 y=${y0+33} font-size=13 fill="var(--fg)" font-weight=700>${f(last.v)}</text><text x=4 y=${y0+49} font-size=10 fill="var(--sub)">${flat?'변화 없음':'범위 '+f(lo)+'~'+f(hi)}</text>`;
    h+=`<path d="${r.pts.map((p,j)=>(j?'L':'M')+X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ')}" fill=none stroke="${col}" stroke-width=2 stroke-linejoin=round />`+r.pts.map(p=>`<circle cx=${X(p.t).toFixed(1)} cy=${Y(p.v).toFixed(1)} r=3 fill="${col}"/>`).join('');
   });
@@ -270,6 +295,7 @@ function drawChart(){
   const show=ev=>{
    const t0=TS[0],t1=TS[TS.length-1],x=L+(W-L-R)*(t1===t0?0:(t-t0)/(t1-t0));vl.setAttribute('x1',x);vl.setAttribute('x2',x);vl.style.display='';
    let d='';const lines=rowsD.map(r=>{const j=r.pts.findIndex(p=>p.t===t);if(j<0)return `<span style="color:${MCOL[r.k]}">●</span> ${M[r.k]} -`;const p=r.pts[j],pv=j?r.pts[j-1]:null;d=p.d;const reset=AC&&pv&&p.d.slice(0,7)!==pv.d.slice(0,7),dl=pv?p.v-pv.v:null;
+    if(r.mode==='day'){const b=r.bars.find(x=>t>=x.a&&t<=x.b);if(b)return `<span style="color:${MCOL[r.k]}">●</span> ${M[r.k]} <b>${f(p.v)}</b> <span style="opacity:.75">${b.lab} 하루 ${b.v>=0?'+':''}${f(Math.round(b.v))}${b.faint?' (추정)':''}</span>`}
     return `<span style="color:${MCOL[r.k]}">●</span> ${M[r.k]} <b>${f(p.v)}</b>`+(reset?' <span style="opacity:.7">(월 초기화)</span>':dl==null?'':` <span style="opacity:.75">${dl>0?'+':dl<0?'-':'±'}${f(Math.abs(dl))}</span>`)});
    tip.innerHTML=`<b>${d}</b><br>`+lines.join('<br>');tip.style.display='block';
    const r=c.getBoundingClientRect();let tx=ev.clientX-r.left+16,ty=ev.clientY-r.top+14;
@@ -280,6 +306,7 @@ function drawChart(){
   el.onmouseenter=show;el.onmousemove=show;
  });
  if(svg)svg.onmouseleave=()=>{tip.style.display='none';vl.style.display='none'};
+ c.querySelectorAll('[data-cm]').forEach(b=>b.onclick=()=>{const[k,m]=b.dataset.cm.split(':');chartMode[k]=m;try{localStorage.setItem('hh_cmode',JSON.stringify(chartMode))}catch(e){}drawChart()});
  c.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{const k=b.dataset.m,i=ON.indexOf(k);if(i>=0){if(ON.length>1)ON.splice(i,1)}else ON.push(k);drawChart()});
  $('#cx').onclick=()=>{chartId=null;drawChart()};
 }

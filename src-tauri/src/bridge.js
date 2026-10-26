@@ -124,6 +124,47 @@
     refreshLock();
     setStatus(files.length ? `폴더에서 기록 ${SNAPS.length}개를 읽었어요${bad ? ` (읽지 못한 파일 ${bad}개)` : ''}` : '저장 폴더가 비어 있어요. 스냅샷을 받거나 파일을 올려 주세요.');
     selftest();
+    checkUpdate();
+    setTimeout(askSnapshot, 800);
+  }
+
+  // ---------- 12시간 지나면 스냅샷 물어보기 (+ 월말 안내) ----------
+  const ASK_HOURS = 12;
+  const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+  const askOn = () => lsGet('hh_ask12') !== '0'; // 기본 켜짐
+  async function askSnapshot() {
+    if (!askOn() || busy || !lastTaken) return;
+    if (Date.now() - lastTaken < ASK_HOURS * 3600000) return;
+    if (+lsGet('hh_ask_snooze') > Date.now()) return; // '아니오' 뒤 12시간은 다시 묻지 않음
+    const L = lockInfo();
+    if (L && L.hard) return; // 크랙이 막아서 쉬는 중이면 묻지 않음
+    const now = new Date(), monthEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getDate() === 1;
+    const hours = Math.floor((Date.now() - lastTaken) / 3600000);
+    const tail = (monthEnd ? '\n\n오늘은 이달의 마지막 날이에요. 지금 받아 두면 이번 달 수익이 빠짐없이 계산돼요.' : '') + '\n\n(아니오를 누르면 12시간 동안 다시 묻지 않아요. 위쪽 체크칸으로 끌 수 있어요.)';
+    const snooze = () => lsSet('hh_ask_snooze', String(Date.now() + ASK_HOURS * 3600000));
+    if (!(await refreshLogin())) {
+      if (confirm(`마지막 스냅샷을 받은 지 ${hours}시간이 지났어요.\n먼저 크랙 로그인이 필요해요. 크랙 페이지를 열까요?` + tail)) onLoginBtn(); else snooze();
+      return;
+    }
+    if (confirm(`마지막 스냅샷을 받은 지 ${hours}시간이 지났어요.\n지금 스냅샷을 받을까요?` + tail)) { if (snapBtnRef) takeSnapshotUI(snapBtnRef); } else snooze();
+  }
+
+  // ---------- 새 버전 알림 (GitHub 릴리스에 최신 버전 이름만 물어봄, 실패는 조용히 넘어감) ----------
+  const newer = (a, b) => { const p = v => String(v).split('.').map(n => parseInt(n, 10) || 0); const x = p(a), y = p(b); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
+  async function checkUpdate() {
+    try {
+      const r = await call('check_update');
+      if (!r || !/^\d+\.\d+/.test(r.latest) || !newer(r.latest, r.current)) return;
+      const h = document.querySelector('header');
+      if (!h || h.querySelector('#hh_upd')) return;
+      const d = document.createElement('div');
+      d.id = 'hh_upd';
+      d.style.cssText = 'margin:0 0 6px;font-size:13px';
+      d.innerHTML = `<b style="color:var(--acc)">새 버전 v${r.latest}이 나왔어요</b> <span style="color:var(--sub)">(지금 v${r.current})</span> <a href="#" style="color:var(--acc)">받으러 가기</a>`;
+      d.querySelector('a').onclick = e => { e.preventDefault(); call('open_release').catch(() => {}); };
+      h.querySelector('h1').insertAdjacentElement('afterend', d);
+    } catch (e) {}
   }
 
   // ---------- 화면: 앱 버튼 ----------
@@ -154,6 +195,14 @@
     const themeBtn = mk(themeLabel(), () => { if (window.toggleTheme) toggleTheme(); themeBtn.textContent = themeLabel(); });
     themeBtn.title = '화면을 밝게/어둡게 바꿔요 (선택은 기억돼요)';
     try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { themeBtn.textContent = themeLabel(); }); } catch (e) {}
+    const ask = document.createElement('label');
+    ask.style.cssText = 'display:flex;align-items:center;gap:6px;color:var(--sub);font-size:13px;cursor:pointer';
+    ask.title = '앱을 켤 때 마지막 스냅샷이 12시간 넘게 지났으면 받을지 물어봐요 (선택은 기억돼요)';
+    ask.innerHTML = '<input type="checkbox">12시간 지나면 스냅샷 물어보기';
+    const askBox = ask.querySelector('input');
+    askBox.checked = askOn();
+    askBox.onchange = () => lsSet('hh_ask12', askBox.checked ? '1' : '0');
+    bar.appendChild(ask);
     statusEl = document.createElement('span');
     statusEl.style.cssText = 'color:var(--sub);font-size:13px';
     bar.appendChild(statusEl);
@@ -161,7 +210,7 @@
     c.insertAdjacentElement('afterend', bar);
     const by = document.createElement('div');
     by.style.cssText = 'color:var(--sub);font-size:12px;margin:2px 0 0';
-    by.textContent = '넉넉한 취향이 클로드와 함께 만들었어요 · v1.0.0';
+    by.textContent = '넉넉한 취향이 클로드와 함께 만들었어요 · v1.0.1';
     h.appendChild(by);
   }
 
@@ -188,9 +237,10 @@
 
   async function onClearLogin() {
     if (!confirm('이 PC의 아래 위치에 있는 앱 안 브라우저 데이터(크랙·구글 등의 로그인 정보와 캐시)를 모두 지워요.\n\n%LOCALAPPDATA%\\com.nnc1.heunghaengpan\\EBWebView\n\n스냅샷 파일은 지워지지 않아요. 새로운 스냅샷을 받으려면 크랙 페이지 열기에서 다시 로그인해야 해요.\n\n지울까요?')) return;
-    let keep = null, theme = null; try { keep = localStorage.getItem('hh_block_until'); theme = localStorage.getItem('hh_theme'); } catch (e) {}
+    const KEEP = ['hh_block_until', 'hh_theme', 'hh_ask12', 'hh_ask_snooze'], kept = {};
+    KEEP.forEach(k => { const v = lsGet(k); if (v != null) kept[k] = v; });
     try { await call('clear_login_data'); } catch (e) { alert('지우지 못했어요: ' + e); return; }
-    try { if (keep) localStorage.setItem('hh_block_until', keep); if (theme) localStorage.setItem('hh_theme', theme); } catch (e) {} // 접속 제한 시간과 화면 테마는 유지
+    Object.keys(kept).forEach(k => lsSet(k, kept[k])); // 접속 제한 시간, 화면 테마, 스냅샷 물어보기 설정은 유지
     await refreshLogin();
     alert('지웠어요.');
   }

@@ -1,4 +1,4 @@
-// 흥행판 v1.0.0
+// 흥행판 v1.0.1
 // 넉넉한 취향이 클로드와 함께 만들었어요.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -10,6 +10,8 @@ const DIR_NAME: &str = "흥행판_스냅샷";
 const LEDGER_NAME: &str = "흥행판_수익장부.json"; // 예전 버전의 수익 장부 (스냅샷 목록에서 제외)
 const CRACK_URL: &str = "https://crack.wrtn.ai/";
 const API_PREFIX: &str = "https://crack-api.wrtn.ai/";
+const RELEASE_API: &str = "https://api.github.com/repos/nnc-1/heunghaengpan/releases/latest";
+const RELEASES_URL: &str = "https://github.com/nnc-1/heunghaengpan/releases/latest";
 
 /// exe 옆의 저장 폴더(포터블). 만들거나 쓸 수 없으면 None.
 /// 처음 만들어질 때 예전 저장 위치(문서\흥행판_스냅샷)의 기록 파일을 복사해 온다 (원본은 그대로 둠).
@@ -173,6 +175,42 @@ fn open_url(app: AppHandle, url: String) -> Result<(), String> {
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
 
+#[derive(Serialize)]
+struct UpdateInfo {
+    current: String,
+    latest: String,
+}
+
+/// GitHub 릴리스에서 최신 버전 이름만 묻는다 (보내는 정보 없음). 실패하면 Err.
+#[tauri::command]
+async fn check_update() -> Result<UpdateInfo, String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(8))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let res = client
+        .get(RELEASE_API)
+        .header("User-Agent", "heunghaengpan")
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        return Err(format!("응답 {}", res.status().as_u16()));
+    }
+    let body = res.text().await.map_err(|e| e.to_string())?;
+    let v: serde_json::Value = serde_json::from_str(&body).map_err(|e| e.to_string())?;
+    let tag = v.get("tag_name").and_then(|t| t.as_str()).unwrap_or("");
+    Ok(UpdateInfo { current: env!("CARGO_PKG_VERSION").into(), latest: tag.trim_start_matches('v').into() })
+}
+
+/// 최신 릴리스 페이지를 기본 브라우저로 연다 (주소는 고정).
+#[tauri::command]
+fn open_release(app: AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener().open_url(RELEASES_URL, None::<&str>).map_err(|e| e.to_string())
+}
+
 /// 크랙 작품 페이지를 앱 안의 크랙 창에서 연다 (로그인 정보를 같이 씀). 이미 열려 있으면 그 창을 이동.
 #[tauri::command]
 async fn open_in_app(app: AppHandle, url: String) -> Result<(), String> {
@@ -324,6 +362,8 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             list_snapshots,
+            check_update,
+            open_release,
             save_snapshot,
             save_export,
             move_aside,
@@ -342,7 +382,7 @@ fn main() {
         ])
         .setup(|app| {
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("흥행판 · v1.0.0")
+                .title("흥행판 · v1.0.1")
                 .inner_size(1600.0, 900.0)
                 .min_inner_size(900.0, 600.0)
                 .disable_drag_drop_handler()
