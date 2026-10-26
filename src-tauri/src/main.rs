@@ -7,7 +7,7 @@ use std::{fs, path::PathBuf, time::Duration};
 use tauri::{AppHandle, Manager, Url, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 const DIR_NAME: &str = "흥행판_스냅샷";
-const LEDGER_NAME: &str = "흥행판_수익장부.json";
+const LEDGER_NAME: &str = "흥행판_수익장부.json"; // 예전 버전의 수익 장부 (스냅샷 목록에서 제외)
 const CRACK_URL: &str = "https://crack.wrtn.ai/";
 const API_PREFIX: &str = "https://crack-api.wrtn.ai/";
 
@@ -101,23 +101,6 @@ fn list_snapshots(app: AppHandle) -> Result<Vec<FileItem>, String> {
     }
     out.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(out)
-}
-
-/// 수익 장부 파일(저장 폴더 안, 스냅샷 목록에서는 제외)을 읽는다. 없으면 None.
-#[tauri::command]
-fn read_ledger(app: AppHandle) -> Result<Option<String>, String> {
-    let p = data_dir(&app)?.join(LEDGER_NAME);
-    if p.is_file() {
-        fs::read_to_string(&p).map(Some).map_err(|e| format!("수익 장부를 읽지 못했어요: {e}"))
-    } else {
-        Ok(None)
-    }
-}
-
-#[tauri::command]
-fn save_ledger(app: AppHandle, text: String) -> Result<(), String> {
-    let p = data_dir(&app)?.join(LEDGER_NAME);
-    fs::write(&p, text).map_err(|e| format!("수익 장부를 저장하지 못했어요: {e}"))
 }
 
 /// 스냅샷 파일을 저장 폴더에 쓴다. overwrite=false 이고 이미 있으면 건너뛴다.
@@ -295,7 +278,7 @@ fn crack_window_open(app: AppHandle) -> bool {
 }
 
 /// 앱 안 브라우저(크랙·구글 로그인 포함)의 쿠키·캐시·저장소를 Tauri 기본 기능으로 한꺼번에 지운다.
-/// 스냅샷과 장부 파일(exe 옆 폴더)은 건드리지 않는다.
+/// 스냅샷 파일(exe 옆 폴더)은 건드리지 않는다.
 #[tauri::command]
 async fn clear_login_data(app: AppHandle) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("crack") {
@@ -341,8 +324,6 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             list_snapshots,
-            read_ledger,
-            save_ledger,
             save_snapshot,
             save_export,
             move_aside,

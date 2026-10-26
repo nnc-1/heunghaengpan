@@ -69,12 +69,6 @@
       if (before > 0 && SNAPS.length === 0) window.save();
     };
 
-    // 2-2) 수익 장부는 저장 폴더의 파일로 저장 (읽는 동안에는 덮어쓰지 않음)
-    window.saveLedger = function () {
-      if (loading) return;
-      call('save_ledger', { text: JSON.stringify(LEDGER) }).catch(e => alert('수익 장부를 저장하지 못했어요: ' + e));
-    };
-
     // 3) 전체 기록 내보내기는 앱 폴더의 '내보내기' 하위 폴더에 저장
     window.doExport = async function () {
       if (!SNAPS.length) { alert('내보낼 기록이 없어요.'); return; }
@@ -96,11 +90,10 @@
   }
 
   async function loadFolder(orig) {
-    try { const lt = await call('read_ledger'); if (lt) setLedger(JSON.parse(lt)); } catch (e) {}
     const files = await call('list_snapshots');
     // 빠르게 읽으려고 화면 그리기를 잠시 멈췄다가 마지막에 한 번만 그림
-    const R = { render: window.render, drawMgr: window.drawMgr, rebuildBase: window.rebuildBase };
-    window.render = window.drawMgr = window.rebuildBase = function () {};
+    const R = { render: window.render, drawMgr: window.drawMgr };
+    window.render = window.drawMgr = function () {};
     let bad = 0;
     const bundles = [];
     for (const f of files) {
@@ -125,9 +118,9 @@
       }
       try { await call('move_aside', { name: f.name, sub: '가져옴' }); } catch (e) {}
     }
-    window.render = R.render; window.drawMgr = R.drawMgr; window.rebuildBase = R.rebuildBase;
+    window.render = R.render; window.drawMgr = R.drawMgr;
     loading = false;
-    R.rebuildBase(); R.render(); R.drawMgr();
+    R.render(); R.drawMgr();
     refreshLock();
     setStatus(files.length ? `폴더에서 기록 ${SNAPS.length}개를 읽었어요${bad ? ` (읽지 못한 파일 ${bad}개)` : ''}` : '저장 폴더가 비어 있어요. 스냅샷을 받거나 파일을 올려 주세요.');
     selftest();
@@ -194,7 +187,7 @@
   }
 
   async function onClearLogin() {
-    if (!confirm('이 PC의 아래 위치에 있는 앱 안 브라우저 데이터(크랙·구글 등의 로그인 정보와 캐시)를 모두 지워요.\n\n%LOCALAPPDATA%\\com.nnc1.heunghaengpan\\EBWebView\n\n스냅샷과 장부 파일은 지워지지 않아요. 새로운 스냅샷을 받으려면 크랙 페이지 열기에서 다시 로그인해야 해요.\n\n지울까요?')) return;
+    if (!confirm('이 PC의 아래 위치에 있는 앱 안 브라우저 데이터(크랙·구글 등의 로그인 정보와 캐시)를 모두 지워요.\n\n%LOCALAPPDATA%\\com.nnc1.heunghaengpan\\EBWebView\n\n스냅샷 파일은 지워지지 않아요. 새로운 스냅샷을 받으려면 크랙 페이지 열기에서 다시 로그인해야 해요.\n\n지울까요?')) return;
     let keep = null, theme = null; try { keep = localStorage.getItem('hh_block_until'); theme = localStorage.getItem('hh_theme'); } catch (e) {}
     try { await call('clear_login_data'); } catch (e) { alert('지우지 못했어요: ' + e); return; }
     try { if (keep) localStorage.setItem('hh_block_until', keep); if (theme) localStorage.setItem('hh_theme', theme); } catch (e) {} // 접속 제한 시간과 화면 테마는 유지
@@ -351,7 +344,7 @@
       const rep = { snaps: SNAPS.length, rows, count: (document.querySelector('#count') || {}).textContent, status: statusEl && statusEl.textContent, diskKeys: Object.keys(diskKeys).length, buttons: [...document.querySelectorAll('header button')].map(b => b.textContent) };
       // 추가 검사: 새 기록 → 파일 저장, 화면에서 삭제 → '삭제됨' 이동, 토큰/네트워크 호출이 죽지 않는지
       const t = { works: [{ id: '1', name: 'x', msg: 1, like: 1, comment: 1, type: 'story', visibility: 'public' }], snapshot_id: '2026-10-22 12:34' };
-      window.addSnap(t); await sleep(1200); rep.ledger = (await call('read_ledger') || '').length > 0;
+      window.addSnap(t); await sleep(1200);
       rep.afterAdd = (await call('list_snapshots')).map(f => f.name).filter(n => n.includes('12-34'));
       window.SNAPS_BEFORE = SNAPS.length;
       SNAPS = SNAPS.filter(s => s.date !== '2026-10-22 12:34'); window.save(); await sleep(400);
