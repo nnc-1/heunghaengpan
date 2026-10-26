@@ -208,7 +208,7 @@ $('#mgr').onclick=e=>{
  if(t.id==='dall'){DEL=(DEL.length===SNAPS.length)?[]:SNAPS.map(x=>x.date);drawMgr();return}
  if(t.id==='delsel'){if(!DEL.length)return;if(!confirm('선택한 기록 '+DEL.length+'개를 지울까요?\n'+DEL.join('\n')+'\n(다운로드 폴더의 json 파일은 지워지지 않아요)'))return;removeSnaps(DEL.slice());return}
  if(t.id==='compact'){const ds=compactTargets();if(!ds.length){alert('압축할 기록이 없어요. 오늘 이전 날짜마다 기록이 이미 하나씩만 있어요.');return}
-  if(!confirm('일간 압축: 오늘을 뺀 이전 날짜마다 가장 늦은 기록 하나(와 첫 기록)만 남기고 '+ds.length+'개를 지울까요?\n'+ds.join('\n')+(window.__TAURI__?'\n(파일은 저장 폴더의 \'삭제됨\' 폴더로 옮겨져요)':'\n(다운로드 폴더의 json 파일은 지워지지 않아요)')))return;removeSnaps(ds);return}
+  if(!confirm('일간 압축: 오늘을 뺀 이전 날짜마다 가장 늦은 기록 하나만 남기고 '+ds.length+'개를 지울까요?\n'+ds.join('\n')+(window.__TAURI__?'\n(파일은 저장 폴더의 \'삭제됨\' 폴더로 옮겨져요)':'\n(다운로드 폴더의 json 파일은 지워지지 않아요)')))return;removeSnaps(ds);return}
  if(t.closest&&t.closest('#mttl')){MGR_OPEN=!MGR_OPEN;drawMgr();return}
  if(t.id==='selclr'){SEL=[];const was=!!CMP;CMP=null;if(was){render();drawChart()}drawMgr();return}
  if(d.pg){PG+=parseInt(d.pg,10);drawMgr();return}
